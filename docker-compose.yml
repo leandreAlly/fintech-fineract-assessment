@@ -1,0 +1,89 @@
+# Local assessment stack. `docker compose up --build` starts everything.
+name: fintech-fineract
+
+services:
+  db:
+    image: postgres:18.3
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      FINERACT_DB_PASSWORD: ${FINERACT_DB_PASSWORD:-fineract}
+      ERP_DB_PASSWORD: ${ERP_DB_PASSWORD:-erp}
+      INTEGRATION_DB_PASSWORD: ${INTEGRATION_DB_PASSWORD:-integration}
+    volumes:
+      - ./scripts/db/01-init.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
+      - pgdata:/var/lib/postgresql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-q", "-U", "postgres"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  fineract:
+    build:
+      context: ./fineract-customization
+      args:
+        FINERACT_TAG: ${FINERACT_TAG:-1.15.0}
+    image: fintech-fineract:${FINERACT_TAG:-1.15.0}-erp-gl-sync
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      FINERACT_NODE_ID: "1"
+      FINERACT_HIKARI_DRIVER_SOURCE_CLASS_NAME: org.postgresql.Driver
+      FINERACT_HIKARI_JDBC_URL: jdbc:postgresql://db:5432/fineract_tenants
+      FINERACT_HIKARI_USERNAME: fineract
+      FINERACT_HIKARI_PASSWORD: ${FINERACT_DB_PASSWORD:-fineract}
+      FINERACT_DEFAULT_TENANTDB_HOSTNAME: db
+      FINERACT_DEFAULT_TENANTDB_PORT: "5432"
+      FINERACT_DEFAULT_TENANTDB_UID: fineract
+      FINERACT_DEFAULT_TENANTDB_PWD: ${FINERACT_DB_PASSWORD:-fineract}
+      FINERACT_DEFAULT_TENANTDB_CONN_PARAMS: ""
+      FINERACT_DEFAULT_TENANTDB_TIMEZONE: Africa/Kigali
+      FINERACT_DEFAULT_TENANTDB_IDENTIFIER: default
+      FINERACT_DEFAULT_TENANTDB_NAME: fineract_default
+      FINERACT_DEFAULT_TENANTDB_DESCRIPTION: Default Tenant
+      FINERACT_DEFAULT_MASTER_PASSWORD: fineract
+      FINERACT_SERVER_SSL_ENABLED: "true"
+      FINERACT_MANAGEMENT_ENDPOINT_WEB_EXPOSURE_INCLUDE: health,info
+      JAVA_TOOL_OPTIONS: "-Xmx2G"
+    ports:
+      - "8443:8443"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsk https://localhost:8443/fineract-provider/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 60s
+
+  mock-erp:
+    build: ./mock-erp
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://erp:${ERP_DB_PASSWORD:-erp}@db:5432/erp
+    ports:
+      - "8081:8000"
+
+  integration-service:
+    build: ./integration-service
+    depends_on:
+      db:
+        condition: service_healthy
+      mock-erp:
+        condition: service_started
+      fineract:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://integration:${INTEGRATION_DB_PASSWORD:-integration}@db:5432/integration
+      FINERACT_BASE_URL: https://fineract:8443/fineract-provider/api/v1
+      FINERACT_TENANT: default
+      ERP_BASE_URL: http://mock-erp:8000
+    ports:
+      - "8080:8000"
+
+volumes:
+  pgdata:

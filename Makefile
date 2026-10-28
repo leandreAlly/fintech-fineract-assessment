@@ -1,11 +1,13 @@
 # One entry point per task. `make help` lists targets.
 SHELL := /bin/bash
 FINERACT_TAG ?= 1.15.0
-export JAVA_HOME ?= $(shell /usr/libexec/java_home -v 21 2>/dev/null)
+JDK21_BREW := /opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
+export JAVA_HOME ?= $(or $(wildcard $(JDK21_BREW)),$(shell /usr/libexec/java_home -v 21 2>/dev/null))
+GRADLE := ./gradlew --no-daemon -Porg.gradle.java.installations.paths=$(JAVA_HOME)
 FINERACT_DIR := fineract-customization/fineract
 PY_SERVICES := mock-erp integration-service
 
-.PHONY: help up down reset logs fineract-checkout fineract-patch fineract-test fineract-image py-sync py-lint py-test test
+.PHONY: help up down reset logs fineract-checkout fineract-patch fineract-test fineract-it fineract-image py-sync py-lint py-test test
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -28,8 +30,11 @@ fineract-checkout: ## Clone the pinned Fineract tag and apply our patch
 fineract-patch: ## Export the Fineract working-tree changes to patches/erp-gl-sync.patch
 	FINERACT_TAG=$(FINERACT_TAG) scripts/fineract-export-patch.sh
 
-fineract-test: ## Run the Java tests for the GL sync customization (JUnit)
-	cd $(FINERACT_DIR) && ./gradlew --no-daemon :fineract-provider:test --tests '*GlAccountExternalReference*'
+fineract-test: ## Run the JUnit unit tests for the GL sync customization
+	cd $(FINERACT_DIR) && $(GRADLE) :fineract-accounting:test --tests '*GlAccountExternalReference*'
+
+fineract-it: ## Run the JUnit integration test against the running Fineract (make up first)
+	cd $(FINERACT_DIR) && $(GRADLE) :integration-tests:test -PcargoDisabled --tests '*GlAccountExternalReference*'
 
 fineract-image: ## Build the custom Fineract image from source + patch
 	docker compose build fineract

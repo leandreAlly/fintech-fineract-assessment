@@ -1,3 +1,44 @@
+diff --git a/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccount.java b/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccount.java
+index 0107fe2..22e3982 100644
+--- a/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccount.java
++++ b/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccount.java
+@@ -38,6 +38,7 @@ import org.apache.fineract.accounting.glaccount.api.GLAccountJsonInputParams;
+ import org.apache.fineract.infrastructure.codes.domain.CodeValue;
+ import org.apache.fineract.infrastructure.core.api.JsonCommand;
+ import org.apache.fineract.infrastructure.core.domain.AbstractPersistableCustom;
++import org.apache.fineract.infrastructure.core.domain.ExternalId;
+ 
+ @Entity
+ @Table(name = "acc_gl_account", uniqueConstraints = { @UniqueConstraint(columnNames = { "gl_code" }, name = "acc_gl_code") })
+@@ -83,6 +84,9 @@ public class GLAccount extends AbstractPersistableCustom<Long> {
+     @JoinColumn(name = "tag_id")
+     private CodeValue tagId;
+ 
++    @Column(name = "external_id", length = 100, unique = true)
++    private ExternalId externalId;
++
+     public static GLAccount fromJson(final GLAccount parent, final JsonCommand command, final CodeValue glAccountTagType) {
+         final String name = command.stringValueOfParameterNamed(GLAccountJsonInputParams.NAME.getValue());
+         final String glCode = command.stringValueOfParameterNamed(GLAccountJsonInputParams.GL_CODE.getValue());
+diff --git a/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccountRepository.java b/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccountRepository.java
+index 59dd985..2e824fd 100644
+--- a/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccountRepository.java
++++ b/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccountRepository.java
+@@ -19,6 +19,7 @@
+ package org.apache.fineract.accounting.glaccount.domain;
+ 
+ import java.util.Optional;
++import org.apache.fineract.infrastructure.core.domain.ExternalId;
+ import org.springframework.data.jpa.repository.JpaRepository;
+ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+ 
+@@ -27,4 +28,6 @@ public interface GLAccountRepository extends JpaRepository<GLAccount, Long>, Jpa
+     // no added behaviour
+     // adding behaviour to fetch id by glcode for opening balance bulk import
+     Optional<GLAccount> findOneByGlCode(String glCode);
++
++    Optional<GLAccount> findByExternalId(ExternalId externalId);
+ }
 diff --git a/fineract-provider/src/main/resources/db/changelog/tenant/changelog-tenant.xml b/fineract-provider/src/main/resources/db/changelog/tenant/changelog-tenant.xml
 index c603611..e848667 100644
 --- a/fineract-provider/src/main/resources/db/changelog/tenant/changelog-tenant.xml

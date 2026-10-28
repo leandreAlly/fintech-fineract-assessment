@@ -263,10 +263,10 @@ index c68f8b2..4d196e7 100644
  
      CommandProcessingResult deleteGLAccount(Long glAccountId);
 diff --git a/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/service/GLAccountWritePlatformServiceJpaRepositoryImpl.java b/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/service/GLAccountWritePlatformServiceJpaRepositoryImpl.java
-index 0b86e2f..c663e42 100644
+index 0b86e2f..fd11439 100644
 --- a/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/service/GLAccountWritePlatformServiceJpaRepositoryImpl.java
 +++ b/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/service/GLAccountWritePlatformServiceJpaRepositoryImpl.java
-@@ -18,7 +18,13 @@
+@@ -18,8 +18,15 @@
   */
  package org.apache.fineract.accounting.glaccount.service;
  
@@ -278,9 +278,11 @@ index 0b86e2f..c663e42 100644
 +import java.util.Optional;
 +import java.util.Set;
  import lombok.RequiredArgsConstructor;
++import org.apache.commons.lang3.StringUtils;
  import org.apache.fineract.accounting.common.AccountingConstants;
  import org.apache.fineract.accounting.glaccount.api.GLAccountJsonInputParams;
-@@ -28,6 +34,7 @@ import org.apache.fineract.accounting.glaccount.domain.GLAccountRepository;
+ import org.apache.fineract.accounting.glaccount.command.GLAccountCommand;
+@@ -28,6 +35,7 @@ import org.apache.fineract.accounting.glaccount.domain.GLAccountRepository;
  import org.apache.fineract.accounting.glaccount.domain.GLAccountType;
  import org.apache.fineract.accounting.glaccount.exception.GLAccountDisableException;
  import org.apache.fineract.accounting.glaccount.exception.GLAccountDuplicateException;
@@ -288,7 +290,7 @@ index 0b86e2f..c663e42 100644
  import org.apache.fineract.accounting.glaccount.exception.GLAccountInvalidDeleteException;
  import org.apache.fineract.accounting.glaccount.exception.GLAccountInvalidDeleteException.GlAccountInvalidDeleteReason;
  import org.apache.fineract.accounting.glaccount.exception.GLAccountInvalidParentException;
-@@ -41,11 +48,16 @@ import org.apache.fineract.accounting.producttoaccountmapping.domain.ProductToGL
+@@ -41,11 +49,16 @@ import org.apache.fineract.accounting.producttoaccountmapping.domain.ProductToGL
  import org.apache.fineract.infrastructure.codes.domain.CodeValue;
  import org.apache.fineract.infrastructure.codes.domain.CodeValueRepositoryWrapper;
  import org.apache.fineract.infrastructure.core.api.JsonCommand;
@@ -305,7 +307,7 @@ index 0b86e2f..c663e42 100644
  import org.springframework.dao.DataIntegrityViolationException;
  import org.springframework.dao.EmptyResultDataAccessException;
  import org.springframework.dao.NonTransientDataAccessException;
-@@ -60,6 +72,8 @@ public class GLAccountWritePlatformServiceJpaRepositoryImpl implements GLAccount
+@@ -60,6 +73,8 @@ public class GLAccountWritePlatformServiceJpaRepositoryImpl implements GLAccount
  
      private static final Logger LOG = LoggerFactory.getLogger(GLAccountWritePlatformServiceJpaRepositoryImpl.class);
      private static final String GL_ACCOUNT = "glAccount";
@@ -314,7 +316,7 @@ index 0b86e2f..c663e42 100644
  
      private final GLAccountRepository glAccountRepository;
      private final JournalEntryRepository glJournalEntryRepository;
-@@ -110,6 +124,79 @@ public class GLAccountWritePlatformServiceJpaRepositoryImpl implements GLAccount
+@@ -110,6 +125,80 @@ public class GLAccountWritePlatformServiceJpaRepositoryImpl implements GLAccount
          }
      }
  
@@ -363,7 +365,8 @@ index 0b86e2f..c663e42 100644
 +                && Objects.equals(glAccount.getUsage(), accountCommand.usage())
 +                && glAccount.isManualEntriesAllowed() == Boolean.TRUE.equals(accountCommand.manualEntriesAllowed())
 +                && glAccount.isDisabled() == Boolean.TRUE.equals(accountCommand.disabled())
-+                && Objects.equals(glAccount.getDescription(), accountCommand.description())
++                && Objects.equals(StringUtils.defaultString(glAccount.getDescription()),
++                        StringUtils.defaultString(accountCommand.description()))
 +                && Objects.equals(parentId, accountCommand.parentId()) && Objects.equals(tagId, accountCommand.tagId());
 +    }
 +
@@ -396,10 +399,10 @@ index 0b86e2f..c663e42 100644
      public CommandProcessingResult updateGLAccount(final Long glAccountId, final JsonCommand command) {
 diff --git a/fineract-accounting/src/test/java/org/apache/fineract/accounting/glaccount/service/GlAccountExternalReferenceSyncTest.java b/fineract-accounting/src/test/java/org/apache/fineract/accounting/glaccount/service/GlAccountExternalReferenceSyncTest.java
 new file mode 100644
-index 0000000..fc2f2ac
+index 0000000..bd2dd79
 --- /dev/null
 +++ b/fineract-accounting/src/test/java/org/apache/fineract/accounting/glaccount/service/GlAccountExternalReferenceSyncTest.java
-@@ -0,0 +1,154 @@
+@@ -0,0 +1,165 @@
 +/**
 + * Licensed to the Apache Software Foundation (ASF) under one
 + * or more contributor license agreements. See the NOTICE file
@@ -486,6 +489,17 @@ index 0000000..fc2f2ac
 +    @Test
 +    void returnsExistingAccountForSameReferenceAndIdenticalPayload() {
 +        when(glAccountRepository.findByExternalId(new ExternalId(EXTERNAL_ID))).thenReturn(Optional.of(existingAccount()));
++
++        CommandProcessingResult result = service.syncGLAccount(command(payload("Loan Receivable")));
++
++        assertEquals(EXISTING_ID, result.getResourceId());
++        verify(glAccountRepository, never()).saveAndFlush(any());
++    }
++
++    @Test
++    void treatsStoredEmptyDescriptionAsSameAsMissingDescription() {
++        GLAccount stored = existingAccount().setDescription("");
++        when(glAccountRepository.findByExternalId(new ExternalId(EXTERNAL_ID))).thenReturn(Optional.of(stored));
 +
 +        CommandProcessingResult result = service.syncGLAccount(command(payload("Loan Receivable")));
 +

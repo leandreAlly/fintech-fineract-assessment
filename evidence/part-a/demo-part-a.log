@@ -1,0 +1,32 @@
+== 1. external_id is persisted on the GL account and unique
+HTTP 200 (expected 200)
+{"resourceId":6,"resourceExternalId":"GL-1200"}
+ id | gl_code |      name       | external_id 
+----+---------+-----------------+-------------
+  6 | 1200    | Loan Receivable | GL-1200
+(1 row)
+
+            conname             | pg_get_constraintdef 
+--------------------------------+----------------------
+ acc_gl_account_external_id_key | UNIQUE (external_id)
+(1 row)
+
+== 2. same reference + identical payload returns the existing account
+HTTP 200 (expected 200)
+{"resourceId":6,"resourceExternalId":"GL-1200"}
+ accounts_with_ref 
+-------------------
+                 1
+(1 row)
+
+== 3. same reference + different payload is rejected with 409
+HTTP 409 (expected 409)
+{"httpStatusCode":"409","userMessageGlobalisationCode":"error.msg.glaccount.externalid.conflict","defaultUserMessage":"General Ledger Account with external id GL-1200 already exists (id 6) with a different payload"}
+== 4. endpoint is protected by Fineract's permission model (SYNC_GLACCOUNT)
+-- user gl_sync_demo_1793196892 has a role without SYNC_GLACCOUNT
+HTTP 403 (expected 403)
+{"httpStatusCode":"403","userMessageGlobalisationCode":"error.msg.not.authorized","defaultUserMessage":"Insufficient privileges to perform this action."}
+-- after granting SYNC_GLACCOUNT
+HTTP 200 (expected 200)
+{"resourceId":7,"resourceExternalId":"GL-91793196892"}
+== All Part A behaviours demonstrated

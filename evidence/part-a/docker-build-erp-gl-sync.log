@@ -1,0 +1,300 @@
+ Image fintech-fineract:1.15.0-erp-gl-sync Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 686B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 1.34kB done
+#2 DONE 0.0s
+
+#3 resolve image config for docker-image://docker.io/docker/dockerfile:1.7
+#3 DONE 1.2s
+
+#4 docker-image://docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
+#4 resolve docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e 0.0s done
+#4 CACHED
+
+#5 [internal] load metadata for docker.io/library/eclipse-temurin:21.0.11_10-jre-noble
+#5 ...
+
+#6 [internal] load metadata for docker.io/library/eclipse-temurin:21.0.11_10-jdk-noble
+#6 DONE 1.0s
+
+#5 [internal] load metadata for docker.io/library/eclipse-temurin:21.0.11_10-jre-noble
+#5 DONE 1.0s
+
+#7 [internal] load .dockerignore
+#7 transferring context: 57B done
+#7 DONE 0.0s
+
+#8 [stage-1 1/3] FROM docker.io/library/eclipse-temurin:21.0.11_10-jre-noble@sha256:b251c6e60516a48d6511a33b9afc2f8b1a427e53a598b16c1f29390c9bf916bd
+#8 resolve docker.io/library/eclipse-temurin:21.0.11_10-jre-noble@sha256:b251c6e60516a48d6511a33b9afc2f8b1a427e53a598b16c1f29390c9bf916bd 0.0s done
+#8 DONE 0.0s
+
+#9 [build 1/7] FROM docker.io/library/eclipse-temurin:21.0.11_10-jdk-noble@sha256:8a79c84cdf6967ae437eba13c8859d74d41aeccb1e65a42191ca57b1992ad0b8
+#9 resolve docker.io/library/eclipse-temurin:21.0.11_10-jdk-noble@sha256:8a79c84cdf6967ae437eba13c8859d74d41aeccb1e65a42191ca57b1992ad0b8 0.0s done
+#9 DONE 0.0s
+
+#10 [internal] load build context
+#10 transferring context: 45.34kB done
+#10 DONE 0.0s
+
+#11 [build 2/7] RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+#11 CACHED
+
+#12 [build 3/7] WORKDIR /src
+#12 CACHED
+
+#13 [build 4/7] RUN git clone --depth 1 --branch "1.15.0" https://github.com/apache/fineract.git .
+#13 CACHED
+
+#14 [build 5/7] COPY patches/ /patches/
+#14 DONE 0.0s
+
+#15 [build 6/7] RUN if [ -s /patches/erp-gl-sync.patch ]; then git apply --verbose /patches/erp-gl-sync.patch;     else echo "No patch: building unmodified 1.15.0"; fi
+#15 0.117 Checking patch fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/api/GLAccountsApiResource.java...
+#15 0.117 Checking patch fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/api/GLAccountsApiResourceSwagger.java...
+#15 0.117 Checking patch fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/exception/GLAccountExternalIdConflictException.java...
+#15 0.117 Checking patch fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/exception/GLAccountExternalIdConflictExceptionMapper.java...
+#15 0.117 Checking patch fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/handler/SyncGLAccountCommandHandler.java...
+#15 0.117 Checking patch fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/serialization/GLAccountCommandFromApiJsonDeserializer.java...
+#15 0.117 Checking patch fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/service/GLAccountWritePlatformService.java...
+#15 0.117 Checking patch fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/service/GLAccountWritePlatformServiceJpaRepositoryImpl.java...
+#15 0.117 Checking patch fineract-accounting/src/test/java/org/apache/fineract/accounting/glaccount/service/GlAccountExternalReferenceSyncTest.java...
+#15 0.117 Checking patch fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccount.java...
+#15 0.118 Checking patch fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccountRepository.java...
+#15 0.118 Checking patch fineract-core/src/main/java/org/apache/fineract/commands/domain/CommandWrapperConstants.java...
+#15 0.118 Checking patch fineract-core/src/main/java/org/apache/fineract/commands/service/CommandWrapperBuilder.java...
+#15 0.119 Checking patch fineract-provider/src/main/resources/db/changelog/tenant/changelog-tenant.xml...
+#15 0.119 Checking patch fineract-provider/src/main/resources/db/changelog/tenant/parts/0242_add_gl_account_external_id.xml...
+#15 0.119 Checking patch integration-tests/src/test/java/org/apache/fineract/integrationtests/GlAccountExternalReferenceSyncIntegrationTest.java...
+#15 0.120 Applied patch fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/api/GLAccountsApiResource.java cleanly.
+#15 0.120 Applied patch fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/api/GLAccountsApiResourceSwagger.java cleanly.
+#15 0.120 Applied patch fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/exception/GLAccountExternalIdConflictException.java cleanly.
+#15 0.120 Applied patch fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/exception/GLAccountExternalIdConflictExceptionMapper.java cleanly.
+#15 0.120 Applied patch fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/handler/SyncGLAccountCommandHandler.java cleanly.
+#15 0.120 Applied patch fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/serialization/GLAccountCommandFromApiJsonDeserializer.java cleanly.
+#15 0.120 Applied patch fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/service/GLAccountWritePlatformService.java cleanly.
+#15 0.120 Applied patch fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/service/GLAccountWritePlatformServiceJpaRepositoryImpl.java cleanly.
+#15 0.121 Applied patch fineract-accounting/src/test/java/org/apache/fineract/accounting/glaccount/service/GlAccountExternalReferenceSyncTest.java cleanly.
+#15 0.121 Applied patch fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccount.java cleanly.
+#15 0.121 Applied patch fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccountRepository.java cleanly.
+#15 0.121 Applied patch fineract-core/src/main/java/org/apache/fineract/commands/domain/CommandWrapperConstants.java cleanly.
+#15 0.121 Applied patch fineract-core/src/main/java/org/apache/fineract/commands/service/CommandWrapperBuilder.java cleanly.
+#15 0.121 Applied patch fineract-provider/src/main/resources/db/changelog/tenant/changelog-tenant.xml cleanly.
+#15 0.121 Applied patch fineract-provider/src/main/resources/db/changelog/tenant/parts/0242_add_gl_account_external_id.xml cleanly.
+#15 0.121 Applied patch integration-tests/src/test/java/org/apache/fineract/integrationtests/GlAccountExternalReferenceSyncIntegrationTest.java cleanly.
+#15 DONE 0.1s
+
+#16 [build 7/7] RUN --mount=type=cache,target=/root/.gradle     ./gradlew --no-daemon :fineract-provider:bootJar       -x test -x rat -x spotlessCheck -x checkstyleMain -x spotbugsMain  && cp fineract-provider/build/libs/fineract-provider-*.jar /fineract.jar
+#16 0.552 To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.14.5/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+#16 1.056 Daemon will be stopped at the end of the build 
+#16 3.353 > Task :buildSrc:extractPluginRequests FROM-CACHE
+#16 3.452 > Task :buildSrc:generatePluginAdapters FROM-CACHE
+#16 3.452 > Task :buildSrc:compileJava FROM-CACHE
+#16 3.452 > Task :buildSrc:compileGroovy FROM-CACHE
+#16 3.452 > Task :buildSrc:compileGroovyPlugins FROM-CACHE
+#16 3.551 > Task :buildSrc:pluginDescriptors
+#16 3.551 > Task :buildSrc:processResources
+#16 3.552 > Task :buildSrc:classes
+#16 3.552 > Task :buildSrc:jar
+#16 7.452 
+#16 7.452 > Configure project :
+#16 7.452 matching ref: TAG - 1.15.0
+#16 7.452   ref configuration: TAG - pattern: (\d+\.\d+\.\d+)
+#16 7.452     version: ${describe.tag.version.major}.${describe.tag.version.minor}.${describe.tag.version.patch}
+#16 7.452     describeTagPattern: .*(\d+\.\d+\.\d+).*
+#16 7.452     describeTagFirstParent: false
+#16 7.561 
+#16 7.562 project version: 1.15.0
+#16 13.95 
+#16 13.95 > Task :fineract-command-audit:processResources
+#16 13.95 > Task :fineract-command-jdbc:processResources
+#16 13.95 > Task :fineract-document:processResources NO-SOURCE
+#16 13.95 > Task :spotlessInternalRegisterDependencies
+#16 13.95 > Task :fineract-avro-schemas:preprocessAvroSchemas
+#16 14.05 > Task :fineract-avro-schemas:spotlessJson FROM-CACHE
+#16 14.05 > Task :fineract-avro-schemas:spotlessJsonApply UP-TO-DATE
+#16 14.05 
+#16 14.05 > Task :fineract-charge:generateStaticWeavingPersistenceXml
+#16 14.05 Generated EclipseLink static weaving persistence.xml for :fineract-charge with 47 managed classes from 3 modules
+#16 14.05 
+#16 14.05 > Task :fineract-tax:generateStaticWeavingPersistenceXml
+#16 14.05 Generated EclipseLink static weaving persistence.xml for :fineract-tax with 44 managed classes from 2 modules
+#16 14.05 
+#16 14.05 > Task :fineract-cob:generateStaticWeavingPersistenceXml
+#16 14.05 Generated EclipseLink static weaving persistence.xml for :fineract-cob with 42 managed classes from 2 modules
+#16 14.05 
+#16 14.05 > Task :fineract-rates:generateStaticWeavingPersistenceXml
+#16 14.05 Generated EclipseLink static weaving persistence.xml for :fineract-rates with 42 managed classes from 2 modules
+#16 14.05 
+#16 14.05 > Task :fineract-tax:processResources NO-SOURCE
+#16 14.05 > Task :fineract-cob:processResources NO-SOURCE
+#16 14.05 > Task :fineract-rates:processResources
+#16 14.05 
+#16 14.05 > Task :fineract-branch:generateStaticWeavingPersistenceXml
+#16 14.05 Generated EclipseLink static weaving persistence.xml for :fineract-branch with 59 managed classes from 5 modules
+#16 14.05 
+#16 14.05 > Task :fineract-mix:processResources NO-SOURCE
+#16 14.05 > Task :fineract-branch:processResources
+#16 14.05 > Task :fineract-charge:processResources
+#16 14.05 > Task :fineract-report:processResources NO-SOURCE
+#16 14.15 > Task :fineract-avro-schemas:buildJavaSdk FROM-CACHE
+#16 14.15 
+#16 14.15 > Task :fineract-investor:generateStaticWeavingPersistenceXml
+#16 14.15 Generated EclipseLink static weaving persistence.xml for :fineract-investor with 122 managed classes from 8 modules
+#16 14.15 
+#16 14.15 > Task :fineract-accounting:generateStaticWeavingPersistenceXml
+#16 14.15 Generated EclipseLink static weaving persistence.xml for :fineract-accounting with 55 managed classes from 4 modules
+#16 14.15 
+#16 14.15 > Task :fineract-accounting:processResources
+#16 14.15 > Task :fineract-investor:processResources
+#16 14.15 > Task :fineract-validation:compileJava FROM-CACHE
+#16 14.15 > Task :fineract-validation:processResources
+#16 14.15 > Task :fineract-validation:classes
+#16 14.25 > Task :fineract-validation:jar
+#16 14.25 
+#16 14.25 > Task :fineract-savings:generateStaticWeavingPersistenceXml
+#16 14.25 Generated EclipseLink static weaving persistence.xml for :fineract-savings with 82 managed classes from 7 modules
+#16 14.25 
+#16 14.25 > Task :fineract-security:generateStaticWeavingPersistenceXml
+#16 14.25 Generated EclipseLink static weaving persistence.xml for :fineract-security with 42 managed classes from 2 modules
+#16 14.25 
+#16 14.25 > Task :fineract-security:processResources NO-SOURCE
+#16 14.25 > Task :fineract-savings:processResources
+#16 14.25 
+#16 14.25 > Task :fineract-core:generateStaticWeavingPersistenceXml
+#16 14.25 Generated EclipseLink static weaving persistence.xml for :fineract-core with 40 managed classes from 1 modules
+#16 14.25 
+#16 14.25 > Task :fineract-core:processResources NO-SOURCE
+#16 14.25 
+#16 14.25 > Task :fineract-loan-origination:generateStaticWeavingPersistenceXml
+#16 14.25 Generated EclipseLink static weaving persistence.xml for :fineract-loan-origination with 142 managed classes from 9 modules
+#16 14.25 
+#16 14.25 > Task :fineract-loan-origination:processResources
+#16 14.25 
+#16 14.25 > Task :fineract-loan:generateStaticWeavingPersistenceXml
+#16 14.25 Generated EclipseLink static weaving persistence.xml for :fineract-loan with 114 managed classes from 7 modules
+#16 14.25 
+#16 14.25 > Task :fineract-avro-schemas:compileJava FROM-CACHE
+#16 14.25 > Task :fineract-loan:processResources
+#16 14.25 > Task :fineract-avro-schemas:processResources
+#16 14.25 > Task :fineract-avro-schemas:classes
+#16 14.35 
+#16 14.35 > Task :fineract-working-capital-loan:generateStaticWeavingPersistenceXml
+#16 14.35 Generated EclipseLink static weaving persistence.xml for :fineract-working-capital-loan with 139 managed classes from 8 modules
+#16 14.45 
+#16 14.45 > Task :fineract-progressive-loan:generateStaticWeavingPersistenceXml
+#16 14.45 Generated EclipseLink static weaving persistence.xml for :fineract-progressive-loan with 117 managed classes from 8 modules
+#16 14.45 
+#16 14.45 > Task :fineract-working-capital-loan:processResources
+#16 14.45 > Task :fineract-progressive-loan:processResources
+#16 14.45 > Task :fineract-command:compileJava FROM-CACHE
+#16 14.45 > Task :fineract-command:processResources
+#16 14.45 > Task :fineract-command:classes
+#16 14.45 > Task :fineract-command:jar
+#16 14.45 > Task :fineract-avro-schemas:jar
+#16 14.45 > Task :fineract-command-audit:compileJava FROM-CACHE
+#16 14.45 > Task :fineract-command-audit:classes
+#16 14.45 > Task :fineract-command-jdbc:compileJava FROM-CACHE
+#16 14.45 > Task :fineract-command-jdbc:classes
+#16 14.45 > Task :fineract-command-audit:jar
+#16 14.45 > Task :fineract-command-jdbc:jar
+#16 14.66 > Task :fineract-core:compileJava FROM-CACHE
+#16 14.66 > Task :fineract-core:classes UP-TO-DATE
+#16 14.75 > Task :fineract-core:jar
+#16 14.95 
+#16 14.95 > Task :fineract-provider:generateStaticWeavingPersistenceXml
+#16 14.95 Generated EclipseLink static weaving persistence.xml for :fineract-provider with 273 managed classes from 15 modules
+#16 14.95 
+#16 14.95 > Task :fineract-tax:compileJava FROM-CACHE
+#16 14.95 > Task :fineract-tax:classes UP-TO-DATE
+#16 14.95 > Task :fineract-rates:compileJava FROM-CACHE
+#16 14.95 > Task :fineract-rates:classes
+#16 14.95 > Task :fineract-tax:jar
+#16 14.95 > Task :fineract-rates:jar
+#16 15.05 > Task :fineract-charge:compileJava FROM-CACHE
+#16 15.05 > Task :fineract-charge:classes
+#16 15.05 > Task :fineract-report:compileJava FROM-CACHE
+#16 15.05 > Task :fineract-report:classes UP-TO-DATE
+#16 15.05 > Task :fineract-charge:jar
+#16 15.05 > Task :fineract-report:jar
+#16 15.05 > Task :fineract-cob:compileJava FROM-CACHE
+#16 15.05 > Task :fineract-cob:classes UP-TO-DATE
+#16 15.05 > Task :fineract-cob:jar
+#16 15.05 > Task :fineract-mix:compileJava FROM-CACHE
+#16 15.05 > Task :fineract-mix:classes UP-TO-DATE
+#16 15.05 > Task :fineract-mix:jar
+#16 15.05 > Task :fineract-security:compileJava FROM-CACHE
+#16 15.05 > Task :fineract-security:classes UP-TO-DATE
+#16 15.05 > Task :fineract-document:compileJava FROM-CACHE
+#16 15.05 > Task :fineract-document:classes UP-TO-DATE
+#16 15.05 > Task :fineract-security:jar
+#16 15.05 > Task :fineract-document:jar
+#16 15.45 > Task :fineract-provider:generateGitProperties
+#16 15.45 > Task :fineract-provider:generateRebelMain
+#16 15.55 > Task :fineract-provider:processResources
+#16 15.55 > Task :fineract-provider:prepareInputYaml
+#16 18.05 > Task :fineract-accounting:compileJava
+#16 18.05 > Task :fineract-accounting:classes
+#16 18.05 > Task :fineract-accounting:jar
+#16 18.15 > Task :fineract-branch:compileJava FROM-CACHE
+#16 18.15 > Task :fineract-branch:classes
+#16 18.15 > Task :fineract-branch:jar
+#16 18.15 > Task :fineract-savings:compileJava FROM-CACHE
+#16 18.15 > Task :fineract-savings:classes
+#16 18.15 > Task :fineract-savings:jar
+#16 18.25 > Task :fineract-loan:compileJava FROM-CACHE
+#16 18.25 > Task :fineract-loan:classes
+#16 18.35 > Task :fineract-loan:jar
+#16 18.45 > Task :fineract-investor:compileJava FROM-CACHE
+#16 18.45 > Task :fineract-investor:classes
+#16 18.45 > Task :fineract-progressive-loan:compileJava FROM-CACHE
+#16 18.45 > Task :fineract-progressive-loan:classes
+#16 18.45 > Task :fineract-investor:jar
+#16 18.45 > Task :fineract-progressive-loan:jar
+#16 18.45 > Task :fineract-working-capital-loan:compileJava FROM-CACHE
+#16 18.45 > Task :fineract-working-capital-loan:classes
+#16 18.55 > Task :fineract-working-capital-loan:jar
+#16 18.55 > Task :fineract-loan-origination:compileJava FROM-CACHE
+#16 18.55 > Task :fineract-loan-origination:classes
+#16 18.55 > Task :fineract-loan-origination:jar
+#16 18.95 > Task :fineract-provider:compileJava FROM-CACHE
+#16 18.95 > Task :fineract-provider:classes
+#16 36.16 > Task :fineract-provider:resolve
+#16 36.16 > Task :fineract-provider:resolveMainClassName
+#16 37.75 > Task :fineract-provider:bootJar
+#16 37.75 
+#16 37.75 [Incubating] Problems report is available at: file:///src/build/reports/problems/problems-report.html
+#16 37.75 
+#16 37.75 Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+#16 37.75 
+#16 37.75 You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+#16 37.75 
+#16 37.75 For more on this, please refer to https://docs.gradle.org/8.14.5/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+#16 37.75 
+#16 37.75 BUILD SUCCESSFUL in 37s
+#16 37.75 95 actionable tasks: 65 executed, 29 from cache, 1 up-to-date
+#16 DONE 38.3s
+
+#17 [stage-1 2/3] RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*  && useradd --system --uid 10001 fineract
+#17 CACHED
+
+#18 [stage-1 3/3] COPY --from=build /fineract.jar /app/fineract.jar
+#18 DONE 0.1s
+
+#19 exporting to image
+#19 exporting layers
+#19 exporting layers 3.4s done
+#19 exporting manifest sha256:4fb1b1ca7b12a066777a764592b9a2951e78019c43918d73668e561c7d2c0fa5 done
+#19 exporting config sha256:e55b344042bc34585577fdccac938e9a8b7a73a7f1f536520ffc19cbd22d3629 done
+#19 exporting attestation manifest sha256:95f14a44705c025ab30d0fcea412cfd3b9e265b45373ab968be8d7aeff1a4338 0.0s done
+#19 exporting manifest list sha256:a309553d864fc7993397a77dfa9c9a184117692875b7e48417e31a277b9d1bc9 0.0s done
+#19 naming to docker.io/library/fintech-fineract:1.15.0-erp-gl-sync done
+#19 unpacking to docker.io/library/fintech-fineract:1.15.0-erp-gl-sync
+#19 unpacking to docker.io/library/fintech-fineract:1.15.0-erp-gl-sync 0.7s done
+#19 DONE 4.2s
+
+#20 resolving provenance for metadata file
+#20 DONE 0.0s
+ Image fintech-fineract:1.15.0-erp-gl-sync Built 

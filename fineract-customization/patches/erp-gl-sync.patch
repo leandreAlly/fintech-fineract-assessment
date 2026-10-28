@@ -102,6 +102,221 @@ index 0000000..758c1e2
 +        return 4091;
 +    }
 +}
+diff --git a/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/handler/SyncGLAccountCommandHandler.java b/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/handler/SyncGLAccountCommandHandler.java
+new file mode 100644
+index 0000000..ed51b2b
+--- /dev/null
++++ b/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/handler/SyncGLAccountCommandHandler.java
+@@ -0,0 +1,43 @@
++/**
++ * Licensed to the Apache Software Foundation (ASF) under one
++ * or more contributor license agreements. See the NOTICE file
++ * distributed with this work for additional information
++ * regarding copyright ownership. The ASF licenses this file
++ * to you under the Apache License, Version 2.0 (the
++ * "License"); you may not use this file except in compliance
++ * with the License. You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing,
++ * software distributed under the License is distributed on an
++ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
++ * KIND, either express or implied. See the License for the
++ * specific language governing permissions and limitations
++ * under the License.
++ */
++package org.apache.fineract.accounting.glaccount.handler;
++
++import lombok.RequiredArgsConstructor;
++import org.apache.fineract.accounting.glaccount.service.GLAccountWritePlatformService;
++import org.apache.fineract.commands.annotation.CommandType;
++import org.apache.fineract.commands.handler.NewCommandSourceHandler;
++import org.apache.fineract.infrastructure.core.api.JsonCommand;
++import org.apache.fineract.infrastructure.core.data.CommandProcessingResult;
++import org.springframework.stereotype.Service;
++import org.springframework.transaction.annotation.Transactional;
++
++@Service
++@CommandType(entity = "GLACCOUNT", action = "SYNC")
++@RequiredArgsConstructor
++public class SyncGLAccountCommandHandler implements NewCommandSourceHandler {
++
++    private final GLAccountWritePlatformService writePlatformService;
++
++    @Transactional
++    @Override
++    public CommandProcessingResult processCommand(final JsonCommand command) {
++
++        return this.writePlatformService.syncGLAccount(command);
++    }
++}
+diff --git a/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/serialization/GLAccountCommandFromApiJsonDeserializer.java b/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/serialization/GLAccountCommandFromApiJsonDeserializer.java
+index 5695a3e..a6353a3 100644
+--- a/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/serialization/GLAccountCommandFromApiJsonDeserializer.java
++++ b/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/serialization/GLAccountCommandFromApiJsonDeserializer.java
+@@ -44,12 +44,15 @@ public final class GLAccountCommandFromApiJsonDeserializer extends AbstractFromA
+ 
+     @Override
+     public GLAccountCommand commandFromApiJson(final String json) {
++        return commandFromApiJson(json, GLAccountJsonInputParams.getAllValues());
++    }
++
++    public GLAccountCommand commandFromApiJson(final String json, final Set<String> supportedParameters) {
+         if (StringUtils.isBlank(json)) {
+             throw new InvalidJsonException();
+         }
+ 
+         final Type typeOfMap = new TypeToken<Map<String, Object>>() {}.getType();
+-        final Set<String> supportedParameters = GLAccountJsonInputParams.getAllValues();
+         this.fromApiJsonHelper.checkForUnsupportedParameters(typeOfMap, json, supportedParameters);
+ 
+         final JsonElement element = this.fromApiJsonHelper.parse(json);
+diff --git a/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/service/GLAccountWritePlatformService.java b/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/service/GLAccountWritePlatformService.java
+index c68f8b2..4d196e7 100644
+--- a/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/service/GLAccountWritePlatformService.java
++++ b/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/service/GLAccountWritePlatformService.java
+@@ -25,6 +25,8 @@ public interface GLAccountWritePlatformService {
+ 
+     CommandProcessingResult createGLAccount(JsonCommand command);
+ 
++    CommandProcessingResult syncGLAccount(JsonCommand command);
++
+     CommandProcessingResult updateGLAccount(Long glAccountId, JsonCommand command);
+ 
+     CommandProcessingResult deleteGLAccount(Long glAccountId);
+diff --git a/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/service/GLAccountWritePlatformServiceJpaRepositoryImpl.java b/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/service/GLAccountWritePlatformServiceJpaRepositoryImpl.java
+index 0b86e2f..c663e42 100644
+--- a/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/service/GLAccountWritePlatformServiceJpaRepositoryImpl.java
++++ b/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/service/GLAccountWritePlatformServiceJpaRepositoryImpl.java
+@@ -18,7 +18,13 @@
+  */
+ package org.apache.fineract.accounting.glaccount.service;
+ 
++import java.util.ArrayList;
++import java.util.HashSet;
++import java.util.List;
+ import java.util.Map;
++import java.util.Objects;
++import java.util.Optional;
++import java.util.Set;
+ import lombok.RequiredArgsConstructor;
+ import org.apache.fineract.accounting.common.AccountingConstants;
+ import org.apache.fineract.accounting.glaccount.api.GLAccountJsonInputParams;
+@@ -28,6 +34,7 @@ import org.apache.fineract.accounting.glaccount.domain.GLAccountRepository;
+ import org.apache.fineract.accounting.glaccount.domain.GLAccountType;
+ import org.apache.fineract.accounting.glaccount.exception.GLAccountDisableException;
+ import org.apache.fineract.accounting.glaccount.exception.GLAccountDuplicateException;
++import org.apache.fineract.accounting.glaccount.exception.GLAccountExternalIdConflictException;
+ import org.apache.fineract.accounting.glaccount.exception.GLAccountInvalidDeleteException;
+ import org.apache.fineract.accounting.glaccount.exception.GLAccountInvalidDeleteException.GlAccountInvalidDeleteReason;
+ import org.apache.fineract.accounting.glaccount.exception.GLAccountInvalidParentException;
+@@ -41,11 +48,16 @@ import org.apache.fineract.accounting.producttoaccountmapping.domain.ProductToGL
+ import org.apache.fineract.infrastructure.codes.domain.CodeValue;
+ import org.apache.fineract.infrastructure.codes.domain.CodeValueRepositoryWrapper;
+ import org.apache.fineract.infrastructure.core.api.JsonCommand;
++import org.apache.fineract.infrastructure.core.data.ApiParameterError;
+ import org.apache.fineract.infrastructure.core.data.CommandProcessingResult;
+ import org.apache.fineract.infrastructure.core.data.CommandProcessingResultBuilder;
++import org.apache.fineract.infrastructure.core.data.DataValidatorBuilder;
++import org.apache.fineract.infrastructure.core.domain.ExternalId;
+ import org.apache.fineract.infrastructure.core.exception.ErrorHandler;
++import org.apache.fineract.infrastructure.core.exception.PlatformApiDataValidationException;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
++import org.springframework.dao.ConcurrencyFailureException;
+ import org.springframework.dao.DataIntegrityViolationException;
+ import org.springframework.dao.EmptyResultDataAccessException;
+ import org.springframework.dao.NonTransientDataAccessException;
+@@ -60,6 +72,8 @@ public class GLAccountWritePlatformServiceJpaRepositoryImpl implements GLAccount
+ 
+     private static final Logger LOG = LoggerFactory.getLogger(GLAccountWritePlatformServiceJpaRepositoryImpl.class);
+     private static final String GL_ACCOUNT = "glAccount";
++    static final String EXTERNAL_ID = "externalId";
++    private static final Set<String> SYNC_PARAMETERS = syncParameters();
+ 
+     private final GLAccountRepository glAccountRepository;
+     private final JournalEntryRepository glJournalEntryRepository;
+@@ -110,6 +124,79 @@ public class GLAccountWritePlatformServiceJpaRepositoryImpl implements GLAccount
+         }
+     }
+ 
++    @Transactional
++    @Override
++    public CommandProcessingResult syncGLAccount(final JsonCommand command) {
++        final GLAccountCommand accountCommand = this.fromApiJsonDeserializer.commandFromApiJson(command.json(), SYNC_PARAMETERS);
++        final String externalIdValue = command.stringValueOfParameterNamed(EXTERNAL_ID);
++        validateExternalId(externalIdValue);
++        accountCommand.validateForCreate();
++        final ExternalId externalId = new ExternalId(externalIdValue);
++
++        final Optional<GLAccount> existing = this.glAccountRepository.findByExternalId(externalId);
++        if (existing.isPresent()) {
++            final GLAccount glAccount = existing.get();
++            if (!isSamePayload(glAccount, accountCommand)) {
++                throw new GLAccountExternalIdConflictException(externalIdValue, glAccount.getId());
++            }
++            return syncResult(command, glAccount);
++        }
++
++        if (this.glAccountRepository.findOneByGlCode(accountCommand.glCode()).isPresent()) {
++            throw new GLAccountDuplicateException(accountCommand.glCode());
++        }
++
++        final GLAccount parentGLAccount = accountCommand.parentId() == null ? null : validateParentGLAccount(accountCommand.parentId());
++        final CodeValue glAccountTagType = accountCommand.tagId() == null ? null
++                : retrieveTagId(accountCommand.tagId(), GLAccountType.fromInt(accountCommand.type()));
++
++        try {
++            final GLAccount glAccount = GLAccount.fromJson(parentGLAccount, command, glAccountTagType).setExternalId(externalId);
++            this.glAccountRepository.saveAndFlush(glAccount);
++            glAccount.generateHierarchy();
++            this.glAccountRepository.saveAndFlush(glAccount);
++            return syncResult(command, glAccount);
++        } catch (final JpaSystemException | DataIntegrityViolationException dve) {
++            throw new ConcurrencyFailureException("Concurrent GL account sync for external id " + externalIdValue, dve);
++        }
++    }
++
++    static boolean isSamePayload(final GLAccount glAccount, final GLAccountCommand accountCommand) {
++        final Long parentId = glAccount.getParent() == null ? null : glAccount.getParent().getId();
++        final Long tagId = glAccount.getTagId() == null ? null : glAccount.getTagId().getId();
++        return Objects.equals(glAccount.getName(), accountCommand.name()) && Objects.equals(glAccount.getGlCode(), accountCommand.glCode())
++                && Objects.equals(glAccount.getType(), accountCommand.type())
++                && Objects.equals(glAccount.getUsage(), accountCommand.usage())
++                && glAccount.isManualEntriesAllowed() == Boolean.TRUE.equals(accountCommand.manualEntriesAllowed())
++                && glAccount.isDisabled() == Boolean.TRUE.equals(accountCommand.disabled())
++                && Objects.equals(glAccount.getDescription(), accountCommand.description())
++                && Objects.equals(parentId, accountCommand.parentId()) && Objects.equals(tagId, accountCommand.tagId());
++    }
++
++    private void validateExternalId(final String externalIdValue) {
++        final List<ApiParameterError> dataValidationErrors = new ArrayList<>();
++        new DataValidatorBuilder(dataValidationErrors).resource("GLAccount").parameter(EXTERNAL_ID).value(externalIdValue).notBlank()
++                .notExceedingLengthOf(100);
++        if (!dataValidationErrors.isEmpty()) {
++            throw new PlatformApiDataValidationException("validation.msg.validation.errors.exist", "Validation errors exist.",
++                    dataValidationErrors);
++        }
++    }
++
++    private CommandProcessingResult syncResult(final JsonCommand command, final GLAccount glAccount) {
++        return new CommandProcessingResultBuilder() //
++                .withCommandId(command.commandId()) //
++                .withEntityId(glAccount.getId()) //
++                .withEntityExternalId(glAccount.getExternalId()) //
++                .build();
++    }
++
++    private static Set<String> syncParameters() {
++        final Set<String> parameters = new HashSet<>(GLAccountJsonInputParams.getAllValues());
++        parameters.add(EXTERNAL_ID);
++        return Set.copyOf(parameters);
++    }
++
+     @Transactional
+     @Override
+     public CommandProcessingResult updateGLAccount(final Long glAccountId, final JsonCommand command) {
 diff --git a/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccount.java b/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccount.java
 index 0107fe2..22e3982 100644
 --- a/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccount.java

@@ -1,3 +1,107 @@
+diff --git a/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/exception/GLAccountExternalIdConflictException.java b/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/exception/GLAccountExternalIdConflictException.java
+new file mode 100644
+index 0000000..a0cea40
+--- /dev/null
++++ b/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/exception/GLAccountExternalIdConflictException.java
+@@ -0,0 +1,36 @@
++/**
++ * Licensed to the Apache Software Foundation (ASF) under one
++ * or more contributor license agreements. See the NOTICE file
++ * distributed with this work for additional information
++ * regarding copyright ownership. The ASF licenses this file
++ * to you under the Apache License, Version 2.0 (the
++ * "License"); you may not use this file except in compliance
++ * with the License. You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing,
++ * software distributed under the License is distributed on an
++ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
++ * KIND, either express or implied. See the License for the
++ * specific language governing permissions and limitations
++ * under the License.
++ */
++package org.apache.fineract.accounting.glaccount.exception;
++
++import lombok.Getter;
++import org.apache.fineract.infrastructure.core.exception.AbstractPlatformDomainRuleException;
++
++@Getter
++public class GLAccountExternalIdConflictException extends AbstractPlatformDomainRuleException {
++
++    private final String externalId;
++    private final Long existingGlAccountId;
++
++    public GLAccountExternalIdConflictException(final String externalId, final Long existingGlAccountId) {
++        super("error.msg.glaccount.externalid.conflict", "General Ledger Account with external id " + externalId + " already exists (id "
++                + existingGlAccountId + ") with a different payload", externalId, existingGlAccountId);
++        this.externalId = externalId;
++        this.existingGlAccountId = existingGlAccountId;
++    }
++}
+diff --git a/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/exception/GLAccountExternalIdConflictExceptionMapper.java b/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/exception/GLAccountExternalIdConflictExceptionMapper.java
+new file mode 100644
+index 0000000..758c1e2
+--- /dev/null
++++ b/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/exception/GLAccountExternalIdConflictExceptionMapper.java
+@@ -0,0 +1,56 @@
++/**
++ * Licensed to the Apache Software Foundation (ASF) under one
++ * or more contributor license agreements. See the NOTICE file
++ * distributed with this work for additional information
++ * regarding copyright ownership. The ASF licenses this file
++ * to you under the Apache License, Version 2.0 (the
++ * "License"); you may not use this file except in compliance
++ * with the License. You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing,
++ * software distributed under the License is distributed on an
++ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
++ * KIND, either express or implied. See the License for the
++ * specific language governing permissions and limitations
++ * under the License.
++ */
++package org.apache.fineract.accounting.glaccount.exception;
++
++import jakarta.ws.rs.core.MediaType;
++import jakarta.ws.rs.core.Response;
++import jakarta.ws.rs.core.Response.Status;
++import jakarta.ws.rs.ext.ExceptionMapper;
++import jakarta.ws.rs.ext.Provider;
++import java.util.List;
++import lombok.extern.slf4j.Slf4j;
++import org.apache.fineract.infrastructure.core.data.ApiGlobalErrorResponse;
++import org.apache.fineract.infrastructure.core.data.ApiParameterError;
++import org.apache.fineract.infrastructure.core.exception.ErrorHandler;
++import org.apache.fineract.infrastructure.core.exceptionmapper.FineractExceptionMapper;
++import org.springframework.context.annotation.Scope;
++import org.springframework.stereotype.Component;
++
++@Provider
++@Component
++@Scope("singleton")
++@Slf4j
++public class GLAccountExternalIdConflictExceptionMapper
++        implements FineractExceptionMapper, ExceptionMapper<GLAccountExternalIdConflictException> {
++
++    @Override
++    public Response toResponse(final GLAccountExternalIdConflictException exception) {
++        log.warn("Exception occurred", ErrorHandler.findMostSpecificException(exception));
++        final ApiGlobalErrorResponse conflictError = ApiGlobalErrorResponse.create(Status.CONFLICT.getStatusCode(),
++                exception.getGlobalisationMessageCode(), exception.getDefaultUserMessage(), exception.getDefaultUserMessage(),
++                List.of(ApiParameterError.generalError(exception.getGlobalisationMessageCode(), exception.getDefaultUserMessage(),
++                        exception.getDefaultUserMessageArgs())));
++        return Response.status(Status.CONFLICT).entity(conflictError).type(MediaType.APPLICATION_JSON).build();
++    }
++
++    @Override
++    public int errorCode() {
++        return 4091;
++    }
++}
 diff --git a/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccount.java b/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccount.java
 index 0107fe2..22e3982 100644
 --- a/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccount.java

@@ -1,3 +1,80 @@
+diff --git a/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/api/GLAccountsApiResource.java b/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/api/GLAccountsApiResource.java
+index 0c400a8..700bf6f 100644
+--- a/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/api/GLAccountsApiResource.java
++++ b/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/api/GLAccountsApiResource.java
+@@ -194,6 +194,25 @@ public class GLAccountsApiResource {
+         return this.commandsSourceWritePlatformService.logCommandSource(commandRequest);
+     }
+ 
++    @POST
++    @Path("sync")
++    @Consumes({ MediaType.APPLICATION_JSON })
++    @Produces({ MediaType.APPLICATION_JSON })
++    @Operation(tags = {
++            "General Ledger Account" }, summary = "Sync a General Ledger Account from the ERP", operationId = "syncGLAccount", description = """
++                    Creates a GL account keyed by the ERP external id. Repeating the request with the same externalId and an identical
++                    payload returns the existing account. The same externalId with a different payload returns 409.
++                    Mandatory Fields:
++                    externalId, name, glCode, type, usage and manualEntriesAllowed
++                    """)
++    @RequestBody(content = @Content(schema = @Schema(implementation = GLAccountsApiResourceSwagger.PostGLAccountsSyncRequest.class)))
++    @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = GLAccountsApiResourceSwagger.PostGLAccountsResponse.class)))
++    @ApiResponse(responseCode = "409", description = "externalId already used with a different payload")
++    public CommandProcessingResult syncGLAccount(@Parameter(hidden = true) final String apiRequestBodyAsJson) {
++        final CommandWrapper commandRequest = new CommandWrapperBuilder().syncGLAccount().withJson(apiRequestBodyAsJson).build();
++        return this.commandsSourceWritePlatformService.logCommandSource(commandRequest);
++    }
++
+     @PUT
+     @Path("{glAccountId}")
+     @Consumes({ MediaType.APPLICATION_JSON })
+diff --git a/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/api/GLAccountsApiResourceSwagger.java b/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/api/GLAccountsApiResourceSwagger.java
+index ca97d53..d0d164c 100644
+--- a/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/api/GLAccountsApiResourceSwagger.java
++++ b/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/api/GLAccountsApiResourceSwagger.java
+@@ -147,6 +147,42 @@ final class GLAccountsApiResourceSwagger {
+         public Long resourceId;
+     }
+ 
++    @Schema(description = "PostGLAccountsSyncRequest")
++    public static final class PostGLAccountsSyncRequest {
++
++        private PostGLAccountsSyncRequest() {
++
++        }
++
++        @Schema(example = "GL-1200")
++        public String externalId;
++
++        @Schema(example = "Loan Receivable")
++        public String name;
++
++        @Schema(example = "1200")
++        public String glCode;
++
++        @Schema(example = "true")
++        public Boolean manualEntriesAllowed;
++
++        @Schema(example = "1")
++        public Integer type;
++
++        @Schema(example = "10")
++        public Long tagId;
++
++        @Schema(example = "1")
++        public Long parentId;
++
++        @Schema(example = "1")
++        public Integer usage;
++
++        @Schema(example = "Desc")
++        public String description;
++
++    }
++
+     @Schema(description = "PutGLAccountsRequest")
+     public static final class PutGLAccountsRequest {
+ 
 diff --git a/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/exception/GLAccountExternalIdConflictException.java b/fineract-accounting/src/main/java/org/apache/fineract/accounting/glaccount/exception/GLAccountExternalIdConflictException.java
 new file mode 100644
 index 0000000..a0cea40
@@ -358,6 +435,45 @@ index 59dd985..2e824fd 100644
 +
 +    Optional<GLAccount> findByExternalId(ExternalId externalId);
  }
+diff --git a/fineract-core/src/main/java/org/apache/fineract/commands/domain/CommandWrapperConstants.java b/fineract-core/src/main/java/org/apache/fineract/commands/domain/CommandWrapperConstants.java
+index 8fd06fa..54e3219 100644
+--- a/fineract-core/src/main/java/org/apache/fineract/commands/domain/CommandWrapperConstants.java
++++ b/fineract-core/src/main/java/org/apache/fineract/commands/domain/CommandWrapperConstants.java
+@@ -25,6 +25,7 @@ public final class CommandWrapperConstants {
+     // Actions
+     public static final String ACTION_CREATE = "CREATE";
+     public static final String ACTION_UPDATE = "UPDATE";
++    public static final String ACTION_SYNC = "SYNC";
+     public static final String ACTION_DELETE = "DELETE";
+     public static final String ACTION_GET = "GET";
+     public static final String ACTION_SAVE = "SAVE";
+diff --git a/fineract-core/src/main/java/org/apache/fineract/commands/service/CommandWrapperBuilder.java b/fineract-core/src/main/java/org/apache/fineract/commands/service/CommandWrapperBuilder.java
+index 2ef93ad..3b5c2d4 100644
+--- a/fineract-core/src/main/java/org/apache/fineract/commands/service/CommandWrapperBuilder.java
++++ b/fineract-core/src/main/java/org/apache/fineract/commands/service/CommandWrapperBuilder.java
+@@ -120,6 +120,7 @@ import static org.apache.fineract.commands.domain.CommandWrapperConstants.ACTION
+ import static org.apache.fineract.commands.domain.CommandWrapperConstants.ACTION_SAVECOLLECTIONSHEET;
+ import static org.apache.fineract.commands.domain.CommandWrapperConstants.ACTION_SETFRAUD;
+ import static org.apache.fineract.commands.domain.CommandWrapperConstants.ACTION_SETTLECASHFROMCASHIER;
++import static org.apache.fineract.commands.domain.CommandWrapperConstants.ACTION_SYNC;
+ import static org.apache.fineract.commands.domain.CommandWrapperConstants.ACTION_TRANSFERCLIENTS;
+ import static org.apache.fineract.commands.domain.CommandWrapperConstants.ACTION_UNASSIGNROLE;
+ import static org.apache.fineract.commands.domain.CommandWrapperConstants.ACTION_UNASSIGNSTAFF;
+@@ -1746,6 +1747,14 @@ public class CommandWrapperBuilder {
+         return this;
+     }
+ 
++    public CommandWrapperBuilder syncGLAccount() {
++        this.actionName = ACTION_SYNC;
++        this.entityName = ENTITY_GLACCOUNT;
++        this.entityId = null;
++        this.href = "/glaccounts/sync";
++        return this;
++    }
++
+     public CommandWrapperBuilder updateGLAccount(final Long glAccountId) {
+         this.actionName = ACTION_UPDATE;
+         this.entityName = ENTITY_GLACCOUNT;
 diff --git a/fineract-provider/src/main/resources/db/changelog/tenant/changelog-tenant.xml b/fineract-provider/src/main/resources/db/changelog/tenant/changelog-tenant.xml
 index c603611..e848667 100644
 --- a/fineract-provider/src/main/resources/db/changelog/tenant/changelog-tenant.xml

@@ -646,10 +646,10 @@ index c603611..e848667 100644
  </databaseChangeLog>
 diff --git a/fineract-provider/src/main/resources/db/changelog/tenant/parts/0242_add_gl_account_external_id.xml b/fineract-provider/src/main/resources/db/changelog/tenant/parts/0242_add_gl_account_external_id.xml
 new file mode 100644
-index 0000000..1b39e14
+index 0000000..24d0e0a
 --- /dev/null
 +++ b/fineract-provider/src/main/resources/db/changelog/tenant/parts/0242_add_gl_account_external_id.xml
-@@ -0,0 +1,46 @@
+@@ -0,0 +1,47 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<!--
 +
@@ -670,6 +670,7 @@ index 0000000..1b39e14
 +    specific language governing permissions and limitations
 +    under the License.
 +
++-->
 +<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
 +                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 +                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
@@ -696,3 +697,127 @@ index 0000000..1b39e14
 +        </insert>
 +    </changeSet>
 +</databaseChangeLog>
+diff --git a/integration-tests/src/test/java/org/apache/fineract/integrationtests/GlAccountExternalReferenceSyncIntegrationTest.java b/integration-tests/src/test/java/org/apache/fineract/integrationtests/GlAccountExternalReferenceSyncIntegrationTest.java
+new file mode 100644
+index 0000000..a16c8e7
+--- /dev/null
++++ b/integration-tests/src/test/java/org/apache/fineract/integrationtests/GlAccountExternalReferenceSyncIntegrationTest.java
+@@ -0,0 +1,118 @@
++/**
++ * Licensed to the Apache Software Foundation (ASF) under one
++ * or more contributor license agreements. See the NOTICE file
++ * distributed with this work for additional information
++ * regarding copyright ownership. The ASF licenses this file
++ * to you under the Apache License, Version 2.0 (the
++ * "License"); you may not use this file except in compliance
++ * with the License. You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing,
++ * software distributed under the License is distributed on an
++ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
++ * KIND, either express or implied. See the License for the
++ * specific language governing permissions and limitations
++ * under the License.
++ */
++package org.apache.fineract.integrationtests;
++
++import static io.restassured.RestAssured.given;
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertNotNull;
++
++import com.google.gson.JsonObject;
++import io.restassured.builder.RequestSpecBuilder;
++import io.restassured.builder.ResponseSpecBuilder;
++import io.restassured.http.ContentType;
++import io.restassured.path.json.JsonPath;
++import io.restassured.specification.RequestSpecification;
++import io.restassured.specification.ResponseSpecification;
++import java.util.List;
++import java.util.Map;
++import org.apache.fineract.client.models.PostUsersRequest;
++import org.apache.fineract.integrationtests.common.OfficeHelper;
++import org.apache.fineract.integrationtests.common.Utils;
++import org.apache.fineract.integrationtests.useradministration.roles.RolesHelper;
++import org.apache.fineract.integrationtests.useradministration.users.UserHelper;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.Test;
++
++public class GlAccountExternalReferenceSyncIntegrationTest {
++
++    private static final String SYNC_URL = "/fineract-provider/api/v1/glaccounts/sync?" + Utils.TENANT_IDENTIFIER;
++    private static final String GL_ACCOUNT_URL = "/fineract-provider/api/v1/glaccounts/";
++
++    private RequestSpecification requestSpec;
++    private ResponseSpecification responseSpec;
++
++    @BeforeEach
++    public void setup() {
++        Utils.initializeRESTAssured();
++        requestSpec = new RequestSpecBuilder().setContentType(ContentType.JSON).build();
++        requestSpec.header("Authorization", "Basic " + Utils.loginIntoServerAndGetBase64EncodedAuthenticationKey());
++        responseSpec = new ResponseSpecBuilder().expectStatusCode(200).build();
++    }
++
++    @Test
++    public void syncIsIdempotentForSamePayloadAndConflictsForDifferentPayload() {
++        String externalId = Utils.uniqueRandomStringGenerator("GL-", 8);
++        String glCode = Utils.uniqueRandomStringGenerator("", 8);
++
++        JsonPath created = sync(requestSpec, payload(externalId, glCode, "Loan Receivable"), 200);
++        Integer glAccountId = created.getInt("resourceId");
++        assertNotNull(glAccountId);
++        assertEquals(externalId, created.getString("resourceExternalId"));
++
++        JsonPath repeated = sync(requestSpec, payload(externalId, glCode, "Loan Receivable"), 200);
++        assertEquals(glAccountId, repeated.getInt("resourceId"));
++
++        JsonPath conflict = sync(requestSpec, payload(externalId, glCode, "Loans Receivable"), 409);
++        assertEquals("error.msg.glaccount.externalid.conflict", conflict.getString("userMessageGlobalisationCode"));
++
++        JsonPath glAccount = JsonPath
++                .from(Utils.performServerGet(requestSpec, responseSpec, GL_ACCOUNT_URL + glAccountId + "?" + Utils.TENANT_IDENTIFIER));
++        assertEquals("Loan Receivable", glAccount.getString("name"));
++        assertEquals(glCode, glAccount.getString("glCode"));
++    }
++
++    @Test
++    public void syncRequiresSyncGlAccountPermission() {
++        Integer roleId = RolesHelper.createRole(requestSpec, responseSpec);
++        String username = Utils.uniqueRandomStringGenerator("GlSyncUser", 4);
++        String password = "Str0ngP@sw0rd!";
++        PostUsersRequest user = new PostUsersRequest().username(username).firstname(Utils.randomFirstNameGenerator())
++                .lastname(Utils.randomLastNameGenerator()).email("glsync@test.org").password(password).repeatPassword(password)
++                .sendPasswordToEmail(false).roles(List.of(roleId.longValue())).officeId(OfficeHelper.getHeadOffice().getId());
++        assertNotNull(UserHelper.createUser(requestSpec, responseSpec, user).getResourceId());
++
++        RequestSpecification syncUserSpec = new RequestSpecBuilder().setContentType(ContentType.JSON).build();
++        syncUserSpec.header("Authorization", "Basic " + Utils.loginIntoServerAndGetBase64EncodedAuthenticationKey(username, password));
++        String externalId = Utils.uniqueRandomStringGenerator("GL-", 8);
++        String glCode = Utils.uniqueRandomStringGenerator("", 8);
++
++        sync(syncUserSpec, payload(externalId, glCode, "Cash"), 403);
++
++        RolesHelper.addPermissionsToRole(requestSpec, responseSpec, roleId, Map.of("SYNC_GLACCOUNT", true));
++
++        assertNotNull(sync(syncUserSpec, payload(externalId, glCode, "Cash"), 200).get("resourceId"));
++    }
++
++    private JsonPath sync(RequestSpecification spec, String body, int expectedStatus) {
++        String response = given().spec(spec).body(body).expect().statusCode(expectedStatus).log().ifValidationFails().when().post(SYNC_URL)
++                .andReturn().asString();
++        return JsonPath.from(response);
++    }
++
++    private String payload(String externalId, String glCode, String name) {
++        JsonObject payload = new JsonObject();
++        payload.addProperty("externalId", externalId);
++        payload.addProperty("name", name);
++        payload.addProperty("glCode", glCode);
++        payload.addProperty("type", 1);
++        payload.addProperty("usage", 1);
++        payload.addProperty("manualEntriesAllowed", true);
++        return payload.toString();
++    }
++}

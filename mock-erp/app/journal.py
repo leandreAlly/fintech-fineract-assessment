@@ -4,6 +4,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Annotated
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -12,6 +13,8 @@ from sqlalchemy.orm import Session
 from app.db import get_session
 from app.models import Account, JournalEntry, JournalLine
 from app.schemas import JournalEntryIn, JournalEntryOut
+
+log = structlog.get_logger()
 
 router = APIRouter(prefix="/api/journal-entries", tags=["journal entries"])
 
@@ -105,12 +108,25 @@ def create_entry(session: Session, data: JournalEntryIn) -> tuple[JournalEntry, 
 def post_journal_entry(
     data: JournalEntryIn, response: Response, session: Annotated[Session, Depends(get_session)]
 ) -> JournalEntry:
+    fields = {
+        "external_reference": data.external_reference,
+        "loan_reference": data.loan_reference,
+        "transaction_type": data.transaction_type,
+    }
     try:
         entry, created = create_entry(session, data)
     except JournalConflictError as error:
+        log.warning("journal_entry_conflict", error=error.message, **fields)
         raise HTTPException(status.HTTP_409_CONFLICT, error.message) from error
     except JournalValidationError as error:
+        log.warning("journal_entry_rejected", error=error.message, **fields)
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, error.message) from error
+    log.info(
+        "journal_entry_created" if created else "journal_entry_replayed",
+        erp_transaction_id=entry.entry_id,
+        total_amount=str(entry.total_amount),
+        **fields,
+    )
     if not created:
         response.status_code = status.HTTP_200_OK
     return entry

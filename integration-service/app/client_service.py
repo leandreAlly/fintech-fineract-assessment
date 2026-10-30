@@ -2,6 +2,7 @@ from collections.abc import Callable
 from datetime import date
 from typing import Any, Protocol
 
+import structlog
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -12,6 +13,8 @@ from app.idempotency import ApiResult, Finished, IdempotencyStore, error_body
 from app.models import Client
 
 CREATE_CLIENT = "CREATE_CLIENT"
+
+log = structlog.get_logger()
 
 
 class CreateClientRequest(BaseModel):
@@ -143,6 +146,12 @@ class ClientService:
         except IntegrityError:
             self.session.rollback()
             return client_uid_conflict(request.client_uid)
+        log.info(
+            "client_created",
+            external_reference=request.external_reference,
+            client_uid=client.client_uid,
+            adopted_existing=existing is not None,
+        )
         return ApiResult(
             201,
             {

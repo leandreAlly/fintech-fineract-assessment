@@ -9,6 +9,7 @@ from app import accounts_sync, admin_api, clients_api, loans_api, reconciliation
 from app.config import settings
 from app.db import engine
 from app.models import GlAccountSync
+from app.observability import CorrelationIdMiddleware, configure_logging
 from app.worker import retry_loop
 
 
@@ -22,7 +23,10 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         await retries
 
 
+configure_logging("integration-service")
+
 app = FastAPI(title="Integration Service", lifespan=lifespan)
+app.add_middleware(CorrelationIdMiddleware)
 app.include_router(accounts_sync.router)
 app.include_router(clients_api.router)
 app.include_router(loans_api.router)

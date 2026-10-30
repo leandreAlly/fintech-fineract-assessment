@@ -4,6 +4,7 @@ import httpx
 
 from app.config import settings
 from app.faults import with_faults
+from app.observability import forward_correlation_id
 
 LOAN_LOCKED = "error.msg.loan.locked"
 
@@ -137,6 +138,7 @@ def build_fineract_client() -> FineractClient:
             auth=(settings.fineract_username, settings.fineract_password),
             headers={"Fineract-Platform-TenantId": settings.fineract_tenant},
             timeout=settings.http_timeout_seconds,
+            event_hooks={"request": [forward_correlation_id]},
             transport=with_faults(
                 httpx.HTTPTransport(verify=settings.fineract_verify_tls), "fineract"
             ),

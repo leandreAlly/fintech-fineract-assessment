@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from typing import Annotated
 
+import structlog
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
@@ -17,6 +18,8 @@ from app.loan_service import (
     RepaymentRequest,
 )
 
+log = structlog.get_logger()
+
 router = APIRouter(tags=["loans"])
 
 Service = Annotated[LoanService, Depends(get_loan_service)]
@@ -26,8 +29,10 @@ def call(run: Callable[[], ApiResult]) -> JSONResponse:
     try:
         return respond(run())
     except FineractUnavailableError as error:
+        log.warning("fineract_unavailable", error=error.message)
         return fineract_unavailable(error)
     except LoanBusyError as error:
+        log.warning("loan_busy", error=str(error))
         return JSONResponse(status_code=503, content=error_body("LOAN_BUSY", str(error)))
 
 

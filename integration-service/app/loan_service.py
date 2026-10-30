@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Protocol
 
+import structlog
 from pydantic import BaseModel, Field
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
@@ -21,7 +22,9 @@ from app.idempotency import ApiResult, Finished, IdempotencyStore, error_body
 from app.loan_locks import LoanBusyError, LoanLocks, NoLoanLocks
 from app.models import Client, Loan, LoanTransaction, TransactionStatus, TransactionType
 from app.retry import RetryPolicy, as_utc, utc_now
-from app.state_machine import transition
+from app.state_machine import transaction_fields, transition
+
+log = structlog.get_logger()
 
 CREATE_LOAN = "CREATE_LOAN"
 APPROVE_LOAN = "APPROVE_LOAN"
@@ -253,6 +256,13 @@ class LoanService:
                 except FineractRejectedError as error:
                     return fineract_rejected(error)
             self.session.commit()
+            log.info(
+                "loan_created",
+                external_reference=request.external_reference,
+                loan_reference=loan.loan_reference,
+                client_uid=client.client_uid,
+                principal=loan.principal,
+            )
         return ApiResult(201, self._loan_body(loan, self.fineract.loan(loan.fineract_loan_id)))
 
     def _reserve_loan(self, request: LoanApplicationRequest, client: Client) -> Loan:
@@ -306,6 +316,12 @@ class LoanService:
             )
         loan.approval_reference = request.external_reference
         self.session.commit()
+        log.info(
+            "loan_approved",
+            external_reference=request.external_reference,
+            loan_reference=loan.loan_reference,
+            client_uid=loan.client.client_uid,
+        )
         return ApiResult(200, self._loan_body(loan, self.fineract.loan(loan.fineract_loan_id)))
 
     def _disburse(self, loan_reference: str, request: DisbursementRequest) -> ApiResult:
@@ -408,6 +424,7 @@ class LoanService:
         except IntegrityError:
             self.session.rollback()
             return None
+        log.info("transaction_received", amount=amount, **transaction_fields(txn))
         return txn
 
     def recover(self, limit: int = 100) -> dict[str, Any]:
@@ -547,11 +564,19 @@ class LoanService:
         txn.last_error = f"ERP unavailable: {error}"
         txn.next_attempt_at = self.retry.next_attempt(self.clock(), txn.erp_attempts)
         self.session.commit()
+        log.warning(
+            "erp_post_failed",
+            error=str(error),
+            erp_attempts=txn.erp_attempts,
+            next_attempt_at=txn.next_attempt_at.isoformat(),
+            **transaction_fields(txn),
+        )
 
     def _needs_reconciliation(self, txn: LoanTransaction, reason: str) -> None:
         txn.last_error = reason
         transition(txn, TransactionStatus.NEEDS_RECONCILIATION)
         self.session.commit()
+        log.warning("transaction_needs_reconciliation", reason=reason, **transaction_fields(txn))
 
     def _posted_transaction(self, txn: LoanTransaction) -> PostedTransaction:
         return PostedTransaction(

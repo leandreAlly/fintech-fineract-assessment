@@ -1,0 +1,29 @@
+== A teller posts repayment FIN-2026-224349 on LN-2026-000050; the ERP answer is lost on the first attempt
+   HTTP/1.1 202 Accepted
+   x-correlation-id: teller-224349
+   {"external_reference":"FIN-2026-224349","loan_reference":"LN-2026-000050","type":"REPAYMENT","status":"ERP_PENDING","amount":458400,"transaction_date":"2026-10-30","principal_portion":383400,"inter
+
+== Question: what happened to FIN-2026-224349?
+
+-- 1. One API call
+   GET /api/transactions/FIN-2026-224349
+   {"external_reference":"FIN-2026-224349","loan_reference":"LN-2026-000050","type":"REPAYMENT","status":"COMPLETED","amount":458400,"transaction_date":"2026-10-30","principal_portion":383400,"interest_portion":75000,"fee_portion":0,"penalty_portion":0,"overpayment_portion":0,"erp_transaction_id":"JE-000146","erp_attempts":2,"next_attempt_at":null,"last_error":null}
+
+-- 2. Logs: every line about FIN-2026-224349, from both services, oldest first
+   docker compose logs integration-service mock-erp | jq 'select(.external_reference == "FIN-2026-224349")'
+   {"timestamp":"2026-10-30T20:43:51.330831Z","service":"integration-service","event":"transaction_received","correlation_id":"teller-224349","status":"FINERACT_PENDING","loan_reference":"LN-2026-000050","client_uid":"SME-324349"}
+   {"timestamp":"2026-10-30T20:43:51.574502Z","service":"integration-service","event":"transaction_status_changed","correlation_id":"teller-224349","status":"FINERACT_DONE","from_status":"FINERACT_PENDING","loan_reference":"LN-2026-000050","client_uid":"SME-324349","fineract_transaction_id":217}
+   {"timestamp":"2026-10-30T20:43:51.576987Z","service":"integration-service","event":"transaction_status_changed","correlation_id":"teller-224349","status":"ERP_PENDING","from_status":"FINERACT_DONE","loan_reference":"LN-2026-000050","client_uid":"SME-324349","fineract_transaction_id":217}
+   {"timestamp":"2026-10-30T20:43:51.581145Z","service":"mock-erp","event":"journal_entry_created","correlation_id":"teller-224349","loan_reference":"LN-2026-000050","erp_transaction_id":"JE-000146"}
+   {"timestamp":"2026-10-30T20:43:51.583325Z","service":"integration-service","event":"erp_post_failed","correlation_id":"teller-224349","status":"ERP_PENDING","loan_reference":"LN-2026-000050","client_uid":"SME-324349","fineract_transaction_id":217,"error":"ReadTimeout: injected erp.journal_entry timeout_after: request processed, response lost"}
+   {"timestamp":"2026-10-30T20:43:53.912216Z","service":"mock-erp","event":"journal_entry_replayed","correlation_id":"recovery-94ff47b2-054d-4ae8-8a64-07eacd828192","loan_reference":"LN-2026-000050","erp_transaction_id":"JE-000146"}
+   {"timestamp":"2026-10-30T20:43:53.915328Z","service":"integration-service","event":"transaction_status_changed","correlation_id":"recovery-94ff47b2-054d-4ae8-8a64-07eacd828192","status":"COMPLETED","from_status":"ERP_PENDING","loan_reference":"LN-2026-000050","client_uid":"SME-324349","fineract_transaction_id":217,"erp_transaction_id":"JE-000146"}
+
+-- 3. Logs: the full request behind the first attempt (correlation_id teller-224349)
+   {"timestamp":"2026-10-30T20:43:51.330831Z","service":"integration-service","event":"transaction_received","status":"FINERACT_PENDING"}
+   {"timestamp":"2026-10-30T20:43:51.574502Z","service":"integration-service","event":"transaction_status_changed","status":"FINERACT_DONE"}
+   {"timestamp":"2026-10-30T20:43:51.576987Z","service":"integration-service","event":"transaction_status_changed","status":"ERP_PENDING"}
+   {"timestamp":"2026-10-30T20:43:51.581145Z","service":"mock-erp","event":"journal_entry_created"}
+   {"timestamp":"2026-10-30T20:43:51.581972Z","service":"mock-erp","event":"http_request","method":"POST","path":"/api/journal-entries","status_code":201}
+   {"timestamp":"2026-10-30T20:43:51.583325Z","service":"integration-service","event":"erp_post_failed","status":"ERP_PENDING","error":"ReadTimeout: injected erp.journal_entry timeout_after: request processed, response lost"}
+   {"timestamp":"2026-10-30T20:43:51.585813Z","service":"integration-service","event":"http_request","method":"POST","path":"/api/loans/LN-2026-000050/repayments","status_code":202}

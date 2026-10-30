@@ -7,6 +7,7 @@ from app.db import SessionLocal
 from app.deps import build_loan_service, build_sync_service
 from app.gateways.erp import build_erp_client
 from app.gateways.fineract import build_fineract_client
+from app.observability import new_correlation_id
 
 log = structlog.get_logger()
 
@@ -19,6 +20,7 @@ def run_retry_pass() -> int:
 
 
 def run_recovery_pass() -> dict[str, Any]:
+    structlog.contextvars.bind_contextvars(correlation_id=f"recovery-{new_correlation_id()}")
     erp = build_erp_client()
     fineract = build_fineract_client()
     with SessionLocal() as session, erp.http, fineract.http:

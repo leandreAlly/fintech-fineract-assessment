@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from app.config import settings
 from app.faults import with_faults
+from app.observability import forward_correlation_id
 
 
 class ErpAccount(BaseModel):
@@ -72,6 +73,7 @@ def build_erp_client() -> ErpClient:
         httpx.Client(
             base_url=settings.erp_base_url,
             timeout=settings.http_timeout_seconds,
+            event_hooks={"request": [forward_correlation_id]},
             transport=with_faults(httpx.HTTPTransport(), "erp"),
         )
     )

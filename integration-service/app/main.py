@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app import accounts_sync, admin_api, clients_api, loans_api
+from app import accounts_sync, admin_api, clients_api, loans_api, reconciliation_api
 from app.config import settings
 from app.db import engine
 from app.models import GlAccountSync
@@ -27,6 +27,7 @@ app.include_router(accounts_sync.router)
 app.include_router(clients_api.router)
 app.include_router(loans_api.router)
 app.include_router(admin_api.router)
+app.include_router(reconciliation_api.router)
 
 
 @app.get("/health")

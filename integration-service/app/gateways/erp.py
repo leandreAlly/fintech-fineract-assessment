@@ -54,9 +54,13 @@ class ErpClient:
         body: dict[str, Any] = response.json()
         return body
 
-    def _get(self, path: str) -> Any:
+    def journal_entries(self, params: dict[str, Any]) -> list[dict[str, Any]]:
+        body: list[dict[str, Any]] = self._get("/api/journal-entries", params)
+        return body
+
+    def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         try:
-            response = self.http.get(path)
+            response = self.http.get(path, params=params)
             response.raise_for_status()
         except httpx.HTTPError as error:
             raise ErpUnavailableError(str(error)) from error

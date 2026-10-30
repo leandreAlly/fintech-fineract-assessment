@@ -72,6 +72,10 @@ class FineractClient:
     def repay_loan(self, loan_id: int, payload: dict[str, Any]) -> None:
         self._post(f"/loans/{loan_id}/transactions?command=repayment", payload)
 
+    def loan_transactions(self, loan_id: int) -> list[dict[str, Any]]:
+        body: dict[str, Any] = self._get(f"/loans/{loan_id}?associations=transactions")
+        return list(body.get("transactions") or [])
+
     def loan_transaction_by_external_id(
         self, loan_id: int, external_id: str
     ) -> dict[str, Any] | None:

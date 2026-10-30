@@ -1,9 +1,10 @@
 import hashlib
 import json
+from datetime import date
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -113,6 +114,27 @@ def post_journal_entry(
     if not created:
         response.status_code = status.HTTP_200_OK
     return entry
+
+
+@router.get("", response_model=list[JournalEntryOut])
+def list_journal_entries(
+    session: Annotated[Session, Depends(get_session)],
+    from_date: date | None = None,
+    to_date: date | None = None,
+    loan_reference: str | None = None,
+    external_reference: Annotated[list[str] | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=10_000)] = 1000,
+) -> list[JournalEntry]:
+    query = select(JournalEntry).order_by(JournalEntry.id).limit(limit)
+    if from_date is not None:
+        query = query.where(JournalEntry.entry_date >= from_date)
+    if to_date is not None:
+        query = query.where(JournalEntry.entry_date <= to_date)
+    if loan_reference is not None:
+        query = query.where(JournalEntry.loan_reference == loan_reference)
+    if external_reference:
+        query = query.where(JournalEntry.external_reference.in_(external_reference))
+    return list(session.scalars(query))
 
 
 @router.get("/{external_reference}", response_model=JournalEntryOut)

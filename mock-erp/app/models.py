@@ -40,6 +40,10 @@ class JournalEntry(Base):
         back_populates="entry", order_by="JournalLine.line_number", lazy="selectin"
     )
 
+    @property
+    def entry_id(self) -> str:
+        return f"JE-{self.id:06d}"
+
 
 class JournalLine(Base):
     __tablename__ = "journal_lines"

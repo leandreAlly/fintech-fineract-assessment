@@ -61,7 +61,26 @@ class FakeErpJournal:
         if self.fail_after is not None:
             error, self.fail_after = self.fail_after, None
             raise error
-        return payload
+        return self.as_erp_entry(payload)
+
+    def as_erp_entry(self, payload: dict[str, Any]) -> dict[str, Any]:
+        number = list(self.entries).index(payload["external_reference"]) + 1
+        return payload | {
+            "entry_id": f"JE-{number:06d}",
+            "total_amount": f"{sum(line['debit'] for line in payload['lines'])}.00",
+        }
+
+    def journal_entries(self, params: dict[str, Any]) -> list[dict[str, Any]]:
+        if self.down:
+            raise ErpUnavailableError("connection refused")
+        references = params.get("external_reference")
+        return [
+            self.as_erp_entry(p)
+            for p in self.entries.values()
+            if (references is None or p["external_reference"] in references)
+            and (params.get("from_date") is None or p["entry_date"] >= params["from_date"])
+            and (params.get("to_date") is None or p["entry_date"] <= params["to_date"])
+        ]
 
 
 class FakeFineract:
@@ -202,7 +221,7 @@ class FakeFineractLoans:
         if self._status(loan_id) != "APPROVED":
             raise FineractRejectedError("loan cannot be disbursed in its current state", 403)
         principal = int(payload["transactionAmount"])
-        self._add_transaction(loan_id, payload["externalId"], principal, None, None)
+        self._add_transaction(loan_id, payload["externalId"], principal, None, None, 1)
         interest = int(principal * self.interest_rate)
         self.loans[loan_id]["summary"] = {
             "principalDisbursed": principal,
@@ -229,7 +248,7 @@ class FakeFineractLoans:
         summary["principalOutstanding"] -= principal
         summary["totalOutstanding"] -= interest + principal
         summary["totalRepayment"] += interest + principal
-        self._add_transaction(loan_id, payload["externalId"], amount, principal, interest)
+        self._add_transaction(loan_id, payload["externalId"], amount, principal, interest, 2)
         if summary["totalOutstanding"] == 0:
             self._set_status(loan_id, "CLOSED")
         self._exit("repay_loan")
@@ -239,6 +258,9 @@ class FakeFineractLoans:
     ) -> dict[str, Any] | None:
         return self.transactions[loan_id].get(external_id)
 
+    def loan_transactions(self, loan_id: int) -> list[dict[str, Any]]:
+        return list(self.transactions[loan_id].values())
+
     def _add_transaction(
         self,
         loan_id: int,
@@ -246,9 +268,13 @@ class FakeFineractLoans:
         amount: int,
         principal: int | None,
         interest: int | None,
+        type_id: int,
     ) -> None:
         self.transactions[loan_id][external_id] = {
             "id": sum(len(t) for t in self.transactions.values()) + 1,
+            "type": {"id": type_id},
+            "date": [2026, 10, 30],
+            "manuallyReversed": False,
             "externalId": external_id,
             "amount": f"{amount}.000000",
             "principalPortion": principal,

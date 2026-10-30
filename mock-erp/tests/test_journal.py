@@ -203,3 +203,28 @@ def test_balance_of_unused_account_is_zero(client: TestClient) -> None:
 
 def test_balance_of_unknown_account_returns_404(client: TestClient) -> None:
     assert client.get("/api/accounts/9999/balance").status_code == 404
+
+
+def test_entry_id_is_the_erp_transaction_id(client: TestClient) -> None:
+    body = client.post("/api/journal-entries", json=disbursement()).json()
+
+    assert body["entry_id"] == "JE-000001"
+
+
+def test_list_filters_by_date_loan_and_reference(client: TestClient) -> None:
+    client.post("/api/journal-entries", json=disbursement())
+    client.post("/api/journal-entries", json=repayment(entry_date="2026-11-15"))
+    client.post(
+        "/api/journal-entries",
+        json=repayment(external_reference="REP-OTHER", loan_reference="LN-2026-000002"),
+    )
+
+    def refs(**params: Any) -> list[str]:
+        response = client.get("/api/journal-entries", params=params)
+        return [entry["external_reference"] for entry in response.json()]
+
+    assert refs() == ["DISB-LN-2026-000001", "REP-1", "REP-OTHER"]
+    assert refs(from_date="2026-11-01") == ["REP-1"]
+    assert refs(to_date="2026-10-31") == ["DISB-LN-2026-000001", "REP-OTHER"]
+    assert refs(loan_reference="LN-2026-000002") == ["REP-OTHER"]
+    assert refs(external_reference=["REP-1", "REP-OTHER"]) == ["REP-1", "REP-OTHER"]

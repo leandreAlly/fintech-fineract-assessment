@@ -90,6 +90,7 @@ class JournalLineOut(BaseModel):
 class JournalEntryOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    entry_id: str
     external_reference: str
     entry_date: date
     currency: str

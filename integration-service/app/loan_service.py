@@ -121,6 +121,7 @@ def transaction_body(txn: LoanTransaction) -> dict[str, Any]:
         "fee_portion": txn.fee_portion,
         "penalty_portion": txn.penalty_portion,
         "overpayment_portion": txn.overpayment_portion,
+        "erp_transaction_id": txn.erp_transaction_id,
         "erp_attempts": txn.erp_attempts,
         "next_attempt_at": txn.next_attempt_at.isoformat() if txn.next_attempt_at else None,
         "last_error": txn.last_error,
@@ -523,13 +524,14 @@ class LoanService:
             return
         txn.erp_attempts += 1
         try:
-            self.erp.post_journal_entry(entry.as_payload())
+            posted = self.erp.post_journal_entry(entry.as_payload())
         except ErpUnavailableError as error:
             self._erp_unavailable(txn, error)
             return
         except ErpRejectedError as error:
             self._needs_reconciliation(txn, error.message)
             return
+        txn.erp_transaction_id = posted.get("entry_id")
         txn.last_error = None
         txn.next_attempt_at = None
         transition(txn, TransactionStatus.COMPLETED)

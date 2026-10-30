@@ -13,6 +13,7 @@ from app.gateways.fineract import FineractClient, build_fineract_client
 from app.gl_sync import GlSyncService
 from app.loan_locks import PostgresLoanLocks
 from app.loan_service import LoanService
+from app.reconciliation import ReconciliationService
 from app.retry import RetryPolicy
 
 
@@ -79,3 +80,11 @@ def get_loan_service(
     erp: Annotated[ErpClient, Depends(get_erp_client)],
 ) -> LoanService:
     return build_loan_service(session, fineract, erp)
+
+
+def get_reconciliation_service(
+    session: Annotated[Session, Depends(get_session)],
+    fineract: Annotated[FineractClient, Depends(get_fineract_client)],
+    erp: Annotated[ErpClient, Depends(get_erp_client)],
+) -> ReconciliationService:
+    return ReconciliationService(session, fineract, erp, settings.currency)

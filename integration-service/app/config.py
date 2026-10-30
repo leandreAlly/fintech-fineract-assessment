@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     fineract_payment_type_id: int = 1
     currency: str = "RWF"
     loan_lock_timeout_seconds: float = 30.0
+    erp_max_attempts: int = 10
+    erp_backoff_base_seconds: float = 2.0
+    erp_backoff_max_seconds: float = 60.0
+    recovery_abandon_after_seconds: float = 900.0
+    idempotency_lease_seconds: float = 60.0
     erp_base_url: str = "http://localhost:8081"
     http_timeout_seconds: float = 10.0
     sync_max_attempts: int = 10

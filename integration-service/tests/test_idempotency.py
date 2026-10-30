@@ -1,8 +1,30 @@
+from datetime import UTC, datetime, timedelta
+
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.idempotency import ApiResult, Finished, IdempotencyStore, Started, request_hash
+from app.models import IdempotencyRecord
 
 PAYLOAD = {"client_uid": "SME-000001", "name": "Umucyo Traders"}
+
+
+class MovingClock:
+    def __init__(self) -> None:
+        self.now = datetime(2026, 10, 30, 12, 0, tzinfo=UTC)
+
+    def __call__(self) -> datetime:
+        return self.now
+
+    def advance(self, seconds: float) -> None:
+        self.now += timedelta(seconds=seconds)
+
+
+def stamp(session: Session, record: IdempotencyRecord, at: datetime) -> None:
+    session.execute(
+        update(IdempotencyRecord).where(IdempotencyRecord.id == record.id).values(updated_at=at)
+    )
+    session.commit()
 
 
 def test_new_reference_starts_operation(session: Session) -> None:
@@ -75,3 +97,59 @@ def test_released_reference_can_run_again(session: Session) -> None:
 def test_hash_ignores_key_order() -> None:
     assert request_hash({"a": 1, "b": 2}) == request_hash({"b": 2, "a": 1})
     assert request_hash({"a": 1}) != request_hash({"a": 2})
+
+
+def test_in_progress_record_within_its_lease_is_not_taken_over(session: Session) -> None:
+    clock = MovingClock()
+    store = IdempotencyStore(session, lease=timedelta(seconds=60), clock=clock)
+    store.begin("REPAY_LOAN", "RPY-1", {"amount": 1})
+
+    clock.advance(30)
+
+    assert isinstance(store.begin("REPAY_LOAN", "RPY-1", {"amount": 1}), Finished)
+
+
+def test_in_progress_record_past_its_lease_is_taken_over(session: Session) -> None:
+    clock = MovingClock()
+    store = IdempotencyStore(session, lease=timedelta(seconds=60), clock=clock)
+    first = store.begin("REPAY_LOAN", "RPY-1", {"amount": 1})
+    assert isinstance(first, Started)
+    stamp(session, first.record, clock())
+
+    clock.advance(61)
+    second = store.begin("REPAY_LOAN", "RPY-1", {"amount": 1})
+    third = store.begin("REPAY_LOAN", "RPY-1", {"amount": 1})
+
+    assert isinstance(second, Started)
+    assert second.record.id == first.record.id
+    assert isinstance(third, Finished)
+    assert third.result.status_code == 202
+
+
+def test_expired_lease_with_a_different_payload_is_still_a_conflict(session: Session) -> None:
+    clock = MovingClock()
+    store = IdempotencyStore(session, lease=timedelta(seconds=60), clock=clock)
+    first = store.begin("REPAY_LOAN", "RPY-1", {"amount": 1})
+    assert isinstance(first, Started)
+    stamp(session, first.record, clock())
+
+    clock.advance(61)
+    outcome = store.begin("REPAY_LOAN", "RPY-1", {"amount": 2})
+
+    assert isinstance(outcome, Finished)
+    assert outcome.result.status_code == 409
+
+
+def test_completed_record_is_never_taken_over(session: Session) -> None:
+    clock = MovingClock()
+    store = IdempotencyStore(session, lease=timedelta(seconds=60), clock=clock)
+    first = store.begin("REPAY_LOAN", "RPY-1", {"amount": 1})
+    assert isinstance(first, Started)
+    store.complete(first.record, ApiResult(201, {"ok": True}))
+    stamp(session, first.record, clock())
+
+    clock.advance(3600)
+    outcome = store.begin("REPAY_LOAN", "RPY-1", {"amount": 1})
+
+    assert isinstance(outcome, Finished)
+    assert outcome.result == ApiResult(200, {"ok": True})

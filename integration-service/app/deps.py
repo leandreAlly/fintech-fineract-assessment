@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from datetime import timedelta
 from typing import Annotated
 
 from fastapi import Depends
@@ -12,6 +13,7 @@ from app.gateways.fineract import FineractClient, build_fineract_client
 from app.gl_sync import GlSyncService
 from app.loan_locks import PostgresLoanLocks
 from app.loan_service import LoanService
+from app.retry import RetryPolicy
 
 
 def get_erp_client() -> Iterator[ErpClient]:
@@ -52,11 +54,7 @@ def get_client_service(
     return ClientService(session, fineract, settings.fineract_office_external_id)
 
 
-def get_loan_service(
-    session: Annotated[Session, Depends(get_session)],
-    fineract: Annotated[FineractClient, Depends(get_fineract_client)],
-    erp: Annotated[ErpClient, Depends(get_erp_client)],
-) -> LoanService:
+def build_loan_service(session: Session, fineract: FineractClient, erp: ErpClient) -> LoanService:
     return LoanService(
         session,
         fineract,
@@ -65,4 +63,19 @@ def get_loan_service(
         payment_type_id=settings.fineract_payment_type_id,
         currency=settings.currency,
         locks=PostgresLoanLocks(engine, settings.loan_lock_timeout_seconds),
+        retry=RetryPolicy(
+            max_attempts=settings.erp_max_attempts,
+            backoff_base_seconds=settings.erp_backoff_base_seconds,
+            backoff_max_seconds=settings.erp_backoff_max_seconds,
+            abandon_after_seconds=settings.recovery_abandon_after_seconds,
+        ),
+        idempotency_lease=timedelta(seconds=settings.idempotency_lease_seconds),
     )
+
+
+def get_loan_service(
+    session: Annotated[Session, Depends(get_session)],
+    fineract: Annotated[FineractClient, Depends(get_fineract_client)],
+    erp: Annotated[ErpClient, Depends(get_erp_client)],
+) -> LoanService:
+    return build_loan_service(session, fineract, erp)

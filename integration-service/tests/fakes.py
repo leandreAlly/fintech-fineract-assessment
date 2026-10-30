@@ -41,11 +41,15 @@ class FakeErpJournal:
         self.entries: dict[str, dict[str, Any]] = {}
         self.calls = 0
         self.down = False
+        self.fail_before: Exception | None = None
         self.fail_after: Exception | None = None
         self.reject: ErpRejectedError | None = None
 
     def post_journal_entry(self, payload: dict[str, Any]) -> dict[str, Any]:
         self.calls += 1
+        if self.fail_before is not None:
+            error, self.fail_before = self.fail_before, None
+            raise error
         if self.down:
             raise ErpUnavailableError("ConnectError: connection refused")
         if self.reject is not None:

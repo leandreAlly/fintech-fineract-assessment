@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from typing import Any, Protocol
 
 from sqlalchemy import or_, select
@@ -10,6 +10,7 @@ from app.gateways.erp import ErpAccount
 from app.gateways.fineract import FineractRejectedError, FineractUnavailableError
 from app.gl_mapping import UnsupportedAccountTypeError, fineract_gl_payload
 from app.models import GlAccountSync, SyncStatus
+from app.retry import backoff_delay, utc_now
 
 
 class ErpAccounts(Protocol):
@@ -26,14 +27,6 @@ class AccountNotFoundError(Exception):
     def __init__(self, external_reference: str) -> None:
         super().__init__(f"ERP has no account with external_reference {external_reference}")
         self.external_reference = external_reference
-
-
-def utc_now() -> datetime:
-    return datetime.now(UTC)
-
-
-def backoff_delay(attempts: int, base_seconds: float, max_seconds: float) -> timedelta:
-    return timedelta(seconds=min(max_seconds, base_seconds * 2 ** (attempts - 1)))
 
 
 class GlSyncService:

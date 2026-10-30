@@ -1,10 +1,10 @@
 from collections.abc import Callable
-from datetime import date
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Protocol
 
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -16,10 +16,11 @@ from app.accounting import (
 )
 from app.client_service import fineract_date
 from app.gateways.erp import ErpRejectedError, ErpUnavailableError
-from app.gateways.fineract import FineractRejectedError
+from app.gateways.fineract import FineractRejectedError, FineractUnavailableError
 from app.idempotency import ApiResult, Finished, IdempotencyStore, error_body
-from app.loan_locks import LoanLocks, NoLoanLocks
+from app.loan_locks import LoanBusyError, LoanLocks, NoLoanLocks
 from app.models import Client, Loan, LoanTransaction, TransactionStatus, TransactionType
+from app.retry import RetryPolicy, as_utc, utc_now
 from app.state_machine import transition
 
 CREATE_LOAN = "CREATE_LOAN"
@@ -90,6 +91,12 @@ def loan_status(fineract_loan: dict[str, Any]) -> str:
     return code.removeprefix("loanStatusType.").replace(".", "_").upper()
 
 
+RECOVERABLE_STATES = (
+    TransactionStatus.FINERACT_PENDING,
+    TransactionStatus.FINERACT_DONE,
+    TransactionStatus.ERP_PENDING,
+)
+
 APPROVED_STATES = {"APPROVED", "ACTIVE", "CLOSED_OBLIGATIONS_MET", "OVERPAID"}
 
 
@@ -114,6 +121,8 @@ def transaction_body(txn: LoanTransaction) -> dict[str, Any]:
         "fee_portion": txn.fee_portion,
         "penalty_portion": txn.penalty_portion,
         "overpayment_portion": txn.overpayment_portion,
+        "erp_attempts": txn.erp_attempts,
+        "next_attempt_at": txn.next_attempt_at.isoformat() if txn.next_attempt_at else None,
         "last_error": txn.last_error,
     }
 
@@ -135,7 +144,10 @@ class LoanService:
         payment_type_id: int,
         currency: str = "RWF",
         locks: LoanLocks | None = None,
+        retry: RetryPolicy | None = None,
+        idempotency_lease: timedelta = timedelta(seconds=60),
         today: Callable[[], date] = date.today,
+        clock: Callable[[], datetime] = utc_now,
     ) -> None:
         self.session = session
         self.fineract = fineract
@@ -144,8 +156,10 @@ class LoanService:
         self.locks = locks or NoLoanLocks()
         self.product_external_id = product_external_id
         self.payment_type_id = payment_type_id
+        self.retry = retry or RetryPolicy()
         self.today = today
-        self.idempotency = IdempotencyStore(session)
+        self.clock = clock
+        self.idempotency = IdempotencyStore(session, idempotency_lease, clock)
 
     def apply(self, request: LoanApplicationRequest) -> ApiResult:
         return self._idempotent(
@@ -395,25 +409,70 @@ class LoanService:
             return None
         return txn
 
+    def recover(self, limit: int = 100) -> dict[str, Any]:
+        ids = list(
+            self.session.scalars(
+                select(LoanTransaction.id)
+                .where(LoanTransaction.status.in_(RECOVERABLE_STATES))
+                .where(
+                    or_(
+                        LoanTransaction.next_attempt_at.is_(None),
+                        LoanTransaction.next_attempt_at <= self.clock(),
+                    )
+                )
+                .order_by(LoanTransaction.id)
+                .limit(limit)
+            )
+        )
+        self.session.commit()
+        outcomes = []
+        for txn_id in ids:
+            txn = self.session.get(LoanTransaction, txn_id, populate_existing=True)
+            if txn is None or txn.loan.fineract_loan_id is None:
+                continue
+            before = TransactionStatus(txn.status)
+            note = None
+            try:
+                self._drive(txn, txn.loan.fineract_loan_id, None)
+            except (FineractUnavailableError, LoanBusyError) as error:
+                self.session.rollback()
+                note = str(error)
+            outcomes.append(
+                {
+                    "external_reference": txn.external_reference,
+                    "from": str(before),
+                    "to": str(txn.status),
+                    "erp_attempts": txn.erp_attempts,
+                    "note": note or txn.last_error,
+                }
+            )
+        return {"checked": len(ids), "transactions": outcomes}
+
     def _post_transaction(
         self, txn: LoanTransaction, loan_id: int, send: Callable[[], None]
     ) -> ApiResult:
+        self._drive(txn, loan_id, send)
+        if txn.status == TransactionStatus.FAILED:
+            return ApiResult(422, error_body("FINERACT_REJECTED", txn.last_error or "rejected"))
+        return transaction_result(txn)
+
+    def _drive(self, txn: LoanTransaction, loan_id: int, send: Callable[[], None] | None) -> None:
         if txn.status == TransactionStatus.FINERACT_PENDING:
             with self.locks.hold(loan_id):
                 self.session.refresh(txn)
                 if txn.status == TransactionStatus.FINERACT_PENDING:
                     self._post_to_fineract(txn, loan_id, send)
-        if txn.status == TransactionStatus.FAILED:
-            return ApiResult(422, error_body("FINERACT_REJECTED", txn.last_error or "rejected"))
         if txn.status in (TransactionStatus.FINERACT_DONE, TransactionStatus.ERP_PENDING):
             self._post_to_erp(txn)
-        return transaction_result(txn)
 
     def _post_to_fineract(
-        self, txn: LoanTransaction, loan_id: int, send: Callable[[], None]
+        self, txn: LoanTransaction, loan_id: int, send: Callable[[], None] | None
     ) -> None:
         posted = self.fineract.loan_transaction_by_external_id(loan_id, txn.external_reference)
-        if posted is None:
+        if posted is None and send is None:
+            self._abandon_if_expired(txn)
+            return
+        if posted is None and send is not None:
             try:
                 send()
             except FineractRejectedError as error:
@@ -422,8 +481,8 @@ class LoanService:
                 self.session.commit()
                 return
             posted = self.fineract.loan_transaction_by_external_id(loan_id, txn.external_reference)
-            if posted is None:
-                raise RuntimeError(f"Fineract has no transaction {txn.external_reference}")
+        if posted is None:
+            raise RuntimeError(f"Fineract has no transaction {txn.external_reference}")
         breakdown = breakdown_from_fineract(posted)
         txn.fineract_transaction_id = int(posted["id"])
         txn.amount = money(posted.get("amount"))
@@ -436,10 +495,25 @@ class LoanService:
         transition(txn, TransactionStatus.FINERACT_DONE)
         self.session.commit()
 
+    def _abandon_if_expired(self, txn: LoanTransaction) -> None:
+        age = self.clock() - as_utc(txn.created_at)
+        if age.total_seconds() < self.retry.abandon_after_seconds:
+            self.session.commit()
+            return
+        transition(txn, TransactionStatus.FAILED)
+        txn.last_error = (
+            f"not found in Fineract {int(age.total_seconds())}s after it was received, "
+            "so it was never applied"
+        )
+        self.session.commit()
+
     def _post_to_erp(self, txn: LoanTransaction) -> None:
+        self.session.refresh(txn, with_for_update=True)
         if txn.status == TransactionStatus.FINERACT_DONE:
             transition(txn, TransactionStatus.ERP_PENDING)
+        if txn.status != TransactionStatus.ERP_PENDING:
             self.session.commit()
+            return
         try:
             entry = journal_entry_for(self._posted_transaction(txn))
         except MappingError as error:
@@ -449,14 +523,25 @@ class LoanService:
         try:
             self.erp.post_journal_entry(entry.as_payload())
         except ErpUnavailableError as error:
-            txn.last_error = f"ERP unavailable: {error}"
-            self.session.commit()
+            self._erp_unavailable(txn, error)
             return
         except ErpRejectedError as error:
             self._needs_reconciliation(txn, error.message)
             return
         txn.last_error = None
+        txn.next_attempt_at = None
         transition(txn, TransactionStatus.COMPLETED)
+        self.session.commit()
+
+    def _erp_unavailable(self, txn: LoanTransaction, error: ErpUnavailableError) -> None:
+        if txn.erp_attempts >= self.retry.max_attempts:
+            txn.next_attempt_at = None
+            self._needs_reconciliation(
+                txn, f"ERP still unavailable after {txn.erp_attempts} attempts: {error}"
+            )
+            return
+        txn.last_error = f"ERP unavailable: {error}"
+        txn.next_attempt_at = self.retry.next_attempt(self.clock(), txn.erp_attempts)
         self.session.commit()
 
     def _needs_reconciliation(self, txn: LoanTransaction, reason: str) -> None:

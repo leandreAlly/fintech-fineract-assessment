@@ -6,8 +6,9 @@ from sqlalchemy.orm import Session
 
 from app.gateways.erp import ErpAccount
 from app.gateways.fineract import FineractRejectedError, FineractUnavailableError
-from app.gl_sync import AccountNotFoundError, GlSyncService, backoff_delay
+from app.gl_sync import AccountNotFoundError, GlSyncService
 from app.models import GlAccountSync, SyncStatus
+from app.retry import backoff_delay
 from tests.fakes import INTEREST_INCOME, LOAN_RECEIVABLE, Clock, FakeErp, FakeFineract
 
 

@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     erp_backoff_max_seconds: float = 60.0
     recovery_abandon_after_seconds: float = 900.0
     idempotency_lease_seconds: float = 60.0
+    fault_injection_enabled: bool = False
     erp_base_url: str = "http://localhost:8081"
     http_timeout_seconds: float = 10.0
     sync_max_attempts: int = 10

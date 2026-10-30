@@ -451,6 +451,8 @@ class LoanService:
     def _post_transaction(
         self, txn: LoanTransaction, loan_id: int, send: Callable[[], None]
     ) -> ApiResult:
+        if txn.status == TransactionStatus.COMPLETED:
+            return ApiResult(200, transaction_body(txn))
         self._drive(txn, loan_id, send)
         if txn.status == TransactionStatus.FAILED:
             return ApiResult(422, error_body("FINERACT_REJECTED", txn.last_error or "rejected"))

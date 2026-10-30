@@ -4,6 +4,7 @@ import httpx
 from pydantic import BaseModel
 
 from app.config import settings
+from app.faults import with_faults
 
 
 class ErpAccount(BaseModel):
@@ -64,5 +65,9 @@ class ErpClient:
 
 def build_erp_client() -> ErpClient:
     return ErpClient(
-        httpx.Client(base_url=settings.erp_base_url, timeout=settings.http_timeout_seconds)
+        httpx.Client(
+            base_url=settings.erp_base_url,
+            timeout=settings.http_timeout_seconds,
+            transport=with_faults(httpx.HTTPTransport(), "erp"),
+        )
     )

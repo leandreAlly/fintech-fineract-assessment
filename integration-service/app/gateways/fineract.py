@@ -3,6 +3,7 @@ from typing import Any
 import httpx
 
 from app.config import settings
+from app.faults import with_faults
 
 LOAN_LOCKED = "error.msg.loan.locked"
 
@@ -131,7 +132,9 @@ def build_fineract_client() -> FineractClient:
             base_url=settings.fineract_base_url,
             auth=(settings.fineract_username, settings.fineract_password),
             headers={"Fineract-Platform-TenantId": settings.fineract_tenant},
-            verify=settings.fineract_verify_tls,
             timeout=settings.http_timeout_seconds,
+            transport=with_faults(
+                httpx.HTTPTransport(verify=settings.fineract_verify_tls), "fineract"
+            ),
         )
     )

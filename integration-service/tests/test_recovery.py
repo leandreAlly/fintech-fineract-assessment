@@ -279,3 +279,18 @@ def test_admin_recovery_and_pending_list(
     assert [t["external_reference"] for t in pending] == ["RPY-1"]
     assert report["transactions"][0]["to"] == "COMPLETED"
     assert admin.get("/api/admin/transactions", params={"status": "ERP_PENDING"}).json() == []
+
+
+def test_retry_of_a_transaction_the_sweep_completed_is_a_200_replay(
+    service: LoanService, erp: FakeErpJournal, clock: MovingClock
+) -> None:
+    loan = disbursed_loan(service)
+    erp.down = True
+    assert repay(service, loan, "RPY-1", 600_000)["status_code"] == 202
+    erp.down = False
+    clock.advance(2)
+    service.recover()
+
+    replay = repay(service, loan, "RPY-1", 600_000)
+
+    assert (replay["status_code"], replay["status"]) == (200, "COMPLETED")

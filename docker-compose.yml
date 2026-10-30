@@ -85,6 +85,8 @@ services:
       FINERACT_PASSWORD: ${FINERACT_API_PASSWORD:-Integr4tion-Svc-26!}
       ERP_BASE_URL: http://mock-erp:8000
       FAULT_INJECTION_ENABLED: ${FAULT_INJECTION_ENABLED:-true}
+      API_KEYS: ${INTEGRATION_API_KEYS:-dev-teller-key}
+      ADMIN_API_KEYS: ${INTEGRATION_ADMIN_API_KEYS:-dev-admin-key}
     ports:
       - "8080:8000"
 

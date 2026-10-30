@@ -41,6 +41,7 @@ plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["auth: run with real API key checks instead of the test bypass"]
 asyncio_mode = "auto"
 
 [tool.uv]

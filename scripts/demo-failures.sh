@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
+API_KEY="${INTEGRATION_ADMIN_API_KEY:-dev-admin-key}"
+curl() { command curl -H "X-API-Key: $API_KEY" "$@"; }
+
 API="${INTEGRATION_URL:-http://localhost:8080}/api"
 N="$(date +%H%M%S)"
 CLIENT_UID="SME-$(printf '%06d' $(( (10#$N + 700000) % 1000000 )))"

@@ -7,7 +7,7 @@ GRADLE := ./gradlew --no-daemon -Porg.gradle.java.installations.paths=$(JAVA_HOM
 FINERACT_DIR := fineract-customization/fineract
 PY_SERVICES := mock-erp integration-service
 
-.PHONY: help up down reset logs fineract-checkout fineract-patch fineract-test fineract-it setup demo-clients demo-loan demo-erp demo-failures demo-reconciliation demo-trace demo-a demo-a-sync fineract-image py-sync py-lint py-test test-live test
+.PHONY: help up down reset logs fineract-checkout fineract-patch fineract-test fineract-it setup demo-clients demo-loan demo-erp demo-failures demo-reconciliation demo-trace demo-a demo-a-sync fineract-image py-sync py-lint py-test openapi test-live test
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -74,6 +74,9 @@ py-lint: ## Ruff + mypy for both services
 
 py-test: ## pytest for both services
 	@for s in $(PY_SERVICES); do (cd $$s && uv run pytest -q) || exit 1; done
+
+openapi: ## Export the Integration Service OpenAPI spec to docs/openapi.json
+	mkdir -p docs && cd integration-service && uv run python -c "import json; from app.main import app; print(json.dumps(app.openapi(), indent=2))" > ../docs/openapi.json
 
 test-live: ## Part I parallel tests against the running stack (duplicates, concurrency)
 	cd integration-service && uv run pytest tests_live -s -v -p no:cacheprovider

@@ -11,6 +11,7 @@ import psycopg
 import pytest
 
 API_URL = os.environ.get("INTEGRATION_URL", "http://localhost:8080")
+API_KEY = os.environ.get("INTEGRATION_API_KEY", "dev-teller-key")
 FINERACT_URL = os.environ.get("FINERACT_URL", "https://localhost:8443/fineract-provider/api/v1")
 FINERACT_AUTH = (
     os.environ.get("FINERACT_USERNAME", "integration_service"),
@@ -109,7 +110,7 @@ def report(title: str, rows: dict[str, object]) -> None:
 
 @pytest.fixture(scope="session")
 def api() -> Iterator[Api]:
-    with httpx.Client(base_url=API_URL, timeout=60) as http:
+    with httpx.Client(base_url=API_URL, headers={"X-API-Key": API_KEY}, timeout=60) as http:
         try:
             http.get("/health").raise_for_status()
         except httpx.HTTPError:

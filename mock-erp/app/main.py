@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from app import accounts, journal
 from app.db import Base, SessionLocal, engine
+from app.errors import install_error_handlers
 from app.observability import CorrelationIdMiddleware, configure_logging
 
 
@@ -20,6 +21,7 @@ configure_logging("mock-erp")
 
 app = FastAPI(title="Mock ERP", lifespan=lifespan)
 app.add_middleware(CorrelationIdMiddleware)
+install_error_handlers(app)
 app.include_router(accounts.router)
 app.include_router(journal.router)
 

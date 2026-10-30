@@ -228,3 +228,23 @@ def test_list_filters_by_date_loan_and_reference(client: TestClient) -> None:
     assert refs(to_date="2026-10-31") == ["DISB-LN-2026-000001", "REP-OTHER"]
     assert refs(loan_reference="LN-2026-000002") == ["REP-OTHER"]
     assert refs(external_reference=["REP-1", "REP-OTHER"]) == ["REP-1", "REP-OTHER"]
+
+
+def test_errors_use_the_common_format(client: TestClient) -> None:
+    conflict = client.post("/api/journal-entries", json=disbursement())
+    conflict = client.post(
+        "/api/journal-entries",
+        json=disbursement(
+            lines=[
+                {"account_code": "1200", "debit": "1"},
+                {"account_code": "1100", "credit": "1"},
+            ]
+        ),
+        headers={"X-Correlation-ID": "req-9"},
+    )
+    invalid = client.post("/api/journal-entries", json={"external_reference": "X"})
+
+    assert conflict.json()["error"]["code"] == "CONFLICT"
+    assert conflict.json()["error"]["correlation_id"] == "req-9"
+    assert invalid.json()["error"]["code"] == "VALIDATION_ERROR"
+    assert client.get("/api/journal-entries/NOPE").json()["error"]["code"] == "NOT_FOUND"

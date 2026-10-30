@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import IdempotencyRecord, OperationStatus
+from app.observability import current_correlation_id
 from app.retry import utc_now
 
 
@@ -33,7 +34,11 @@ Outcome = Started | Finished
 
 
 def error_body(code: str, message: str) -> dict[str, Any]:
-    return {"error": {"code": code, "message": message}}
+    error: dict[str, Any] = {"code": code, "message": message}
+    correlation_id = current_correlation_id()
+    if correlation_id:
+        error["correlation_id"] = correlation_id
+    return {"error": error}
 
 
 def request_hash(payload: dict[str, Any]) -> str:

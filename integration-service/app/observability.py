@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 import sys
@@ -85,6 +86,26 @@ def forward_correlation_id(request: httpx.Request) -> None:
         request.headers[CORRELATION_HEADER] = correlation_id
 
 
+async def send_internal_error(send: Send, correlation_id: str) -> None:
+    body = json.dumps(
+        {
+            "error": {
+                "code": "INTERNAL_ERROR",
+                "message": "unexpected error, quote the correlation_id when reporting it",
+                "correlation_id": correlation_id,
+            }
+        }
+    ).encode()
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 500,
+            "headers": [(b"content-type", b"application/json")],
+        }
+    )
+    await send({"type": "http.response.body", "body": body})
+
+
 class CorrelationIdMiddleware:
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
@@ -98,16 +119,23 @@ class CorrelationIdMiddleware:
         structlog.contextvars.bind_contextvars(correlation_id=correlation_id)
         started = time.perf_counter()
         status_code = 500
+        started_response = False
 
         async def send_with_header(message: Message) -> None:
-            nonlocal status_code
+            nonlocal status_code, started_response
             if message["type"] == "http.response.start":
+                started_response = True
                 status_code = message["status"]
                 MutableHeaders(scope=message)[CORRELATION_HEADER] = correlation_id
             await send(message)
 
         try:
             await self.app(scope, receive, send_with_header)
+        except Exception:
+            log.exception("unhandled_error", method=scope["method"], path=scope["path"])
+            if started_response:
+                raise
+            await send_internal_error(send_with_header, correlation_id)
         finally:
             log.info(
                 "http_request",

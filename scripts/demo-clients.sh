@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+API_KEY="${INTEGRATION_API_KEY:-dev-teller-key}"
+curl() { command curl -H "X-API-Key: $API_KEY" "$@"; }
+
 API="${INTEGRATION_URL:-http://localhost:8080}/api/clients"
 N="$(date +%H%M%S)"
 UID1="SME-$N"

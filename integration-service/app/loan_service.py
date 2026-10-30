@@ -8,10 +8,18 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.accounting import (
+    MappingError,
+    PostedTransaction,
+    breakdown_from_fineract,
+    journal_entry_for,
+)
 from app.client_service import fineract_date
+from app.gateways.erp import ErpRejectedError, ErpUnavailableError
 from app.gateways.fineract import FineractRejectedError
 from app.idempotency import ApiResult, Finished, IdempotencyStore, error_body
 from app.models import Client, Loan, LoanTransaction, TransactionStatus, TransactionType
+from app.state_machine import transition
 
 CREATE_LOAN = "CREATE_LOAN"
 APPROVE_LOAN = "APPROVE_LOAN"
@@ -64,6 +72,10 @@ class FineractLoans(Protocol):
     ) -> dict[str, Any] | None: ...
 
 
+class ErpJournal(Protocol):
+    def post_journal_entry(self, payload: dict[str, Any]) -> dict[str, Any]: ...
+
+
 class LoanProductNotConfiguredError(Exception):
     pass
 
@@ -100,8 +112,15 @@ def transaction_body(txn: LoanTransaction) -> dict[str, Any]:
         "interest_portion": txn.interest_portion,
         "fee_portion": txn.fee_portion,
         "penalty_portion": txn.penalty_portion,
+        "overpayment_portion": txn.overpayment_portion,
         "last_error": txn.last_error,
     }
+
+
+def transaction_result(txn: LoanTransaction) -> ApiResult:
+    return ApiResult(
+        201 if txn.status == TransactionStatus.COMPLETED else 202, transaction_body(txn)
+    )
 
 
 class LoanService:
@@ -109,13 +128,17 @@ class LoanService:
         self,
         session: Session,
         fineract: FineractLoans,
+        erp: ErpJournal,
         *,
         product_external_id: str,
         payment_type_id: int,
+        currency: str = "RWF",
         today: Callable[[], date] = date.today,
     ) -> None:
         self.session = session
         self.fineract = fineract
+        self.erp = erp
+        self.currency = currency
         self.product_external_id = product_external_id
         self.payment_type_id = payment_type_id
         self.today = today
@@ -189,7 +212,10 @@ class LoanService:
         except Exception:
             self.idempotency.release(outcome.record)
             raise
-        self.idempotency.complete(outcome.record, result)
+        if result.status_code == 202:
+            self.idempotency.release(outcome.record)
+        else:
+            self.idempotency.complete(outcome.record, result)
         return result
 
     def _apply(self, request: LoanApplicationRequest) -> ApiResult:
@@ -369,28 +395,87 @@ class LoanService:
     def _post_transaction(
         self, txn: LoanTransaction, loan_id: int, send: Callable[[], None]
     ) -> ApiResult:
+        if txn.status == TransactionStatus.FINERACT_PENDING:
+            self._post_to_fineract(txn, loan_id, send)
+        if txn.status == TransactionStatus.FAILED:
+            return ApiResult(422, error_body("FINERACT_REJECTED", txn.last_error or "rejected"))
+        if txn.status in (TransactionStatus.FINERACT_DONE, TransactionStatus.ERP_PENDING):
+            self._post_to_erp(txn)
+        return transaction_result(txn)
+
+    def _post_to_fineract(
+        self, txn: LoanTransaction, loan_id: int, send: Callable[[], None]
+    ) -> None:
         posted = self.fineract.loan_transaction_by_external_id(loan_id, txn.external_reference)
         if posted is None:
             try:
                 send()
             except FineractRejectedError as error:
-                txn.status = TransactionStatus.FAILED
+                transition(txn, TransactionStatus.FAILED)
                 txn.last_error = error.message
                 self.session.commit()
-                return fineract_rejected(error)
+                return
             posted = self.fineract.loan_transaction_by_external_id(loan_id, txn.external_reference)
             if posted is None:
                 raise RuntimeError(f"Fineract has no transaction {txn.external_reference}")
+        breakdown = breakdown_from_fineract(posted)
         txn.fineract_transaction_id = int(posted["id"])
         txn.amount = money(posted.get("amount"))
-        txn.principal_portion = money(posted.get("principalPortion"))
-        txn.interest_portion = money(posted.get("interestPortion"))
-        txn.fee_portion = money(posted.get("feeChargesPortion"))
-        txn.penalty_portion = money(posted.get("penaltyChargesPortion"))
-        txn.status = TransactionStatus.COMPLETED
+        txn.principal_portion = breakdown.principal
+        txn.interest_portion = breakdown.interest
+        txn.fee_portion = breakdown.fees
+        txn.penalty_portion = breakdown.penalties
+        txn.overpayment_portion = breakdown.overpayment
         txn.last_error = None
+        transition(txn, TransactionStatus.FINERACT_DONE)
         self.session.commit()
-        return ApiResult(201, transaction_body(txn))
+
+    def _post_to_erp(self, txn: LoanTransaction) -> None:
+        if txn.status == TransactionStatus.FINERACT_DONE:
+            transition(txn, TransactionStatus.ERP_PENDING)
+            self.session.commit()
+        try:
+            entry = journal_entry_for(self._posted_transaction(txn))
+        except MappingError as error:
+            self._needs_reconciliation(txn, str(error))
+            return
+        txn.erp_attempts += 1
+        try:
+            self.erp.post_journal_entry(entry.as_payload())
+        except ErpUnavailableError as error:
+            txn.last_error = f"ERP unavailable: {error}"
+            self.session.commit()
+            return
+        except ErpRejectedError as error:
+            self._needs_reconciliation(txn, error.message)
+            return
+        txn.last_error = None
+        transition(txn, TransactionStatus.COMPLETED)
+        self.session.commit()
+
+    def _needs_reconciliation(self, txn: LoanTransaction, reason: str) -> None:
+        txn.last_error = reason
+        transition(txn, TransactionStatus.NEEDS_RECONCILIATION)
+        self.session.commit()
+
+    def _posted_transaction(self, txn: LoanTransaction) -> PostedTransaction:
+        return PostedTransaction(
+            external_reference=txn.external_reference,
+            loan_reference=str(txn.loan.loan_reference),
+            type=TransactionType(txn.type),
+            transaction_date=txn.transaction_date,
+            currency=self.currency,
+            amount=txn.amount,
+            breakdown=breakdown_from_fineract(
+                {
+                    "principalPortion": txn.principal_portion,
+                    "interestPortion": txn.interest_portion,
+                    "feeChargesPortion": txn.fee_portion,
+                    "penaltyChargesPortion": txn.penalty_portion,
+                    "overpaymentPortion": txn.overpayment_portion,
+                }
+            ),
+        )
 
     def _locked_loan(self, loan_reference: str) -> Loan | None:
         return self.session.scalar(

@@ -39,7 +39,14 @@ state() {
 repay() {
   local loan="$1" ref="$2" amount="$3"
   post "/loans/$loan/repayments" "$(jq -nc --arg r "$ref" --argjson a "$amount" '{external_reference: $r, amount: $a}')" 201 \
-    | jq -c '{external_reference, amount, principal_portion, interest_portion, fee_portion, penalty_portion}'
+    | jq -c '{external_reference, status, amount, principal_portion, interest_portion, fee_portion, penalty_portion}'
+}
+
+ERP="${ERP_URL:-http://localhost:8081}"
+
+erp_entry() {
+  curl -s "$ERP/api/journal-entries/$1" \
+    | jq -c '{external_reference, transaction_type, total_amount, lines: [.lines[] | "\(.account_code) DR \(.debit) CR \(.credit)"]}'
 }
 
 echo "== 0. Client: create, find by client_uid, validate"
@@ -60,7 +67,7 @@ state "$LOAN" APPROVED
 echo
 echo "== 3. Disbursement"
 post "/loans/$LOAN/disburse" "$(jq -nc --arg r "DSB-$N" '{external_reference: $r}')" 201 \
-  | jq -c '{external_reference, type, amount}'
+  | jq -c '{external_reference, status, type, amount}'
 state "$LOAN" ACTIVE
 
 echo
@@ -93,4 +100,22 @@ curl -s "$API/loans/$LOAN" | jq -e '[.transactions[] | select(.type == "REPAYMEN
 curl -s "$API/transactions/RPY-$N-2" | jq -c .
 
 echo
-echo "== Loan $LOAN closed with obligations met"
+echo "== 9. ERP: one balanced journal entry per Fineract transaction, same external_reference"
+for ref in "DSB-$N" "RPY-$N-1" "RPY-$N-2" "RPY-$N-3" "RPY-$N-FINAL"; do erp_entry "$ref"; done
+
+echo
+echo "== 10. ERP ledger for this loan vs Fineract"
+docker compose exec -T db psql -U postgres -d erp -tAc \
+  "SELECT a.code || ' ' || a.name || ': debits=' || sum(l.debit)::bigint || ' credits=' || sum(l.credit)::bigint
+   FROM journal_lines l JOIN journal_entries e ON e.id = l.entry_id JOIN accounts a ON a.id = l.account_id
+   WHERE e.loan_reference = '$LOAN' GROUP BY a.code, a.name ORDER BY a.code"
+docker compose exec -T db psql -U postgres -d fineract_default -tAc \
+  "SELECT 'fineract: principal_disbursed=' || principal_disbursed_derived::bigint || ' principal_repaid=' || principal_repaid_derived::bigint
+     || ' interest_repaid=' || interest_repaid_derived::bigint || ' total_repaid=' || total_repayment_derived::bigint
+   FROM m_loan WHERE external_id = '$LOAN'"
+docker compose exec -T db psql -U postgres -d integration -tAc \
+  "SELECT 'integration: ' || count(*) || ' transactions, ' || count(*) FILTER (WHERE t.status = 'COMPLETED') || ' COMPLETED'
+   FROM loan_transactions t JOIN loans l ON l.id = t.loan_id WHERE l.loan_reference = '$LOAN'"
+
+echo
+echo "== Loan $LOAN closed with obligations met, ledger posted in the ERP"

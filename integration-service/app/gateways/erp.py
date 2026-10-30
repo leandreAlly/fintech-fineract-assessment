@@ -18,6 +18,13 @@ class ErpUnavailableError(Exception):
     pass
 
 
+class ErpRejectedError(Exception):
+    def __init__(self, message: str, status_code: int) -> None:
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
+
+
 class ErpClient:
     def __init__(self, http: httpx.Client) -> None:
         self.http = http
@@ -30,6 +37,21 @@ class ErpClient:
             (a for a in self.list_accounts() if a.external_reference == external_reference),
             None,
         )
+
+    def post_journal_entry(self, payload: dict[str, Any]) -> dict[str, Any]:
+        try:
+            response = self.http.post("/api/journal-entries", json=payload)
+        except httpx.HTTPError as error:
+            raise ErpUnavailableError(f"{type(error).__name__}: {error}") from error
+        if response.status_code >= 500:
+            raise ErpUnavailableError(f"ERP returned {response.status_code}")
+        if response.status_code >= 400:
+            raise ErpRejectedError(
+                f"ERP rejected the entry ({response.status_code}): {response.text}",
+                response.status_code,
+            )
+        body: dict[str, Any] = response.json()
+        return body
 
     def _get(self, path: str) -> Any:
         try:

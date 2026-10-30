@@ -54,10 +54,13 @@ def get_client_service(
 def get_loan_service(
     session: Annotated[Session, Depends(get_session)],
     fineract: Annotated[FineractClient, Depends(get_fineract_client)],
+    erp: Annotated[ErpClient, Depends(get_erp_client)],
 ) -> LoanService:
     return LoanService(
         session,
         fineract,
+        erp,
         product_external_id=settings.fineract_loan_product_external_id,
         payment_type_id=settings.fineract_payment_type_id,
+        currency=settings.currency,
     )

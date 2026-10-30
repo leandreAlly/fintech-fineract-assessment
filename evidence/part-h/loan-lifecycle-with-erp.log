@@ -1,0 +1,79 @@
+== 0. Client: create, find by client_uid, validate
+POST /clients {"external_reference":"CLI-180937","client_uid":"SME-680937","name":"Inyange Workshop Ltd"}
+HTTP 201 (expected 201)
+{"client_uid":"SME-680937","external_reference":"CLI-180937","name":"Inyange Workshop Ltd","status":"ACTIVE"}
+{"client_uid":"SME-680937","name":"Inyange Workshop Ltd","status":"ACTIVE","office":"Kigali Main Office","checks":{"exists":true,"active":true,"name_matches":true}}
+
+== 1. Application: 5,000,000 RWF, SME Asset Finance (18% a year, 12 monthly instalments)
+POST /loans {"external_reference":"APP-180937","client_uid":"SME-680937","principal":5000000}
+HTTP 201 (expected 201)
+loan_reference: LN-2026-000005
+{"status":"SUBMITTED_AND_PENDING_APPROVAL","submitted_on":"2026-10-30","approved_on":null,"disbursed_on":null,"closed_on":null,"balances":{"principal_disbursed":0,"principal_outstanding":0,"interest_outstanding":0,"total_outstanding":0,"total_repaid":0,"total_expected_repayment":0}}
+fineract m_loan: status_id=100 (Submitted and pending approval) principal_outstanding=0 interest_outstanding=0 total_outstanding=0
+
+== 2. Approval
+POST /loans/LN-2026-000005/approve {"external_reference":"APR-180937"}
+HTTP 200 (expected 200)
+{"status":"APPROVED","submitted_on":"2026-10-30","approved_on":"2026-10-30","disbursed_on":null,"closed_on":null,"balances":{"principal_disbursed":0,"principal_outstanding":0,"interest_outstanding":0,"total_outstanding":0,"total_repaid":0,"total_expected_repayment":0}}
+fineract m_loan: status_id=200 (Approved) principal_outstanding=0 interest_outstanding=0 total_outstanding=0
+
+== 3. Disbursement
+POST /loans/LN-2026-000005/disburse {"external_reference":"DSB-180937"}
+HTTP 201 (expected 201)
+{"external_reference":"DSB-180937","status":"COMPLETED","type":"DISBURSEMENT","amount":5000000}
+{"status":"ACTIVE","submitted_on":"2026-10-30","approved_on":"2026-10-30","disbursed_on":"2026-10-30","closed_on":null,"balances":{"principal_disbursed":5000000,"principal_outstanding":5000000,"interest_outstanding":500799,"total_outstanding":5500799,"total_repaid":0,"total_expected_repayment":5500799}}
+fineract m_loan: status_id=300 (Active) principal_outstanding=5000000 interest_outstanding=500799 total_outstanding=5500799
+
+== 4. Partial repayment 1 of 3 (one instalment)
+POST /loans/LN-2026-000005/repayments {"external_reference":"RPY-180937-1","amount":458400}
+HTTP 201 (expected 201)
+{"external_reference":"RPY-180937-1","status":"COMPLETED","amount":458400,"principal_portion":383400,"interest_portion":75000,"fee_portion":0,"penalty_portion":0}
+{"status":"ACTIVE","submitted_on":"2026-10-30","approved_on":"2026-10-30","disbursed_on":"2026-10-30","closed_on":null,"balances":{"principal_disbursed":5000000,"principal_outstanding":4616600,"interest_outstanding":425799,"total_outstanding":5042399,"total_repaid":458400,"total_expected_repayment":5500799}}
+fineract m_loan: status_id=300 (Active) principal_outstanding=4616600 interest_outstanding=425799 total_outstanding=5042399
+
+== 5. Partial repayment 2 of 3
+POST /loans/LN-2026-000005/repayments {"external_reference":"RPY-180937-2","amount":300000}
+HTTP 201 (expected 201)
+{"external_reference":"RPY-180937-2","status":"COMPLETED","amount":300000,"principal_portion":230751,"interest_portion":69249,"fee_portion":0,"penalty_portion":0}
+{"status":"ACTIVE","submitted_on":"2026-10-30","approved_on":"2026-10-30","disbursed_on":"2026-10-30","closed_on":null,"balances":{"principal_disbursed":5000000,"principal_outstanding":4385849,"interest_outstanding":356550,"total_outstanding":4742399,"total_repaid":758400,"total_expected_repayment":5500799}}
+fineract m_loan: status_id=300 (Active) principal_outstanding=4385849 interest_outstanding=356550 total_outstanding=4742399
+
+== 6. Partial repayment 3 of 3
+POST /loans/LN-2026-000005/repayments {"external_reference":"RPY-180937-3","amount":1000000}
+HTTP 201 (expected 201)
+{"external_reference":"RPY-180937-3","status":"COMPLETED","amount":1000000,"principal_portion":879101,"interest_portion":120899,"fee_portion":0,"penalty_portion":0}
+{"status":"ACTIVE","submitted_on":"2026-10-30","approved_on":"2026-10-30","disbursed_on":"2026-10-30","closed_on":null,"balances":{"principal_disbursed":5000000,"principal_outstanding":3506748,"interest_outstanding":235651,"total_outstanding":3742399,"total_repaid":1758400,"total_expected_repayment":5500799}}
+fineract m_loan: status_id=300 (Active) principal_outstanding=3506748 interest_outstanding=235651 total_outstanding=3742399
+
+== 7. Final payoff of Fineract's total outstanding
+total_outstanding reported by Fineract: 3742399
+POST /loans/LN-2026-000005/repayments {"external_reference":"RPY-180937-FINAL","amount":3742399}
+HTTP 201 (expected 201)
+{"external_reference":"RPY-180937-FINAL","status":"COMPLETED","amount":3742399,"principal_portion":3506748,"interest_portion":235651,"fee_portion":0,"penalty_portion":0}
+{"status":"CLOSED_OBLIGATIONS_MET","submitted_on":"2026-10-30","approved_on":"2026-10-30","disbursed_on":"2026-10-30","closed_on":"2026-10-30","balances":{"principal_disbursed":5000000,"principal_outstanding":0,"interest_outstanding":0,"total_outstanding":0,"total_repaid":5500799,"total_expected_repayment":5500799}}
+fineract m_loan: status_id=600 (Closed (obligations met)) principal_outstanding=0 interest_outstanding=0 total_outstanding=0
+
+== 8. Transactions recorded with Fineract's breakdown (no Fineract ids)
+{"external_reference":"DSB-180937","type":"DISBURSEMENT","amount":5000000,"principal_portion":0,"interest_portion":0}
+{"external_reference":"RPY-180937-1","type":"REPAYMENT","amount":458400,"principal_portion":383400,"interest_portion":75000}
+{"external_reference":"RPY-180937-2","type":"REPAYMENT","amount":300000,"principal_portion":230751,"interest_portion":69249}
+{"external_reference":"RPY-180937-3","type":"REPAYMENT","amount":1000000,"principal_portion":879101,"interest_portion":120899}
+{"external_reference":"RPY-180937-FINAL","type":"REPAYMENT","amount":3742399,"principal_portion":3506748,"interest_portion":235651}
+repayment principal portions add up to the 5,000,000 disbursed
+{"external_reference":"RPY-180937-2","loan_reference":"LN-2026-000005","type":"REPAYMENT","status":"COMPLETED","amount":300000,"transaction_date":"2026-10-30","principal_portion":230751,"interest_portion":69249,"fee_portion":0,"penalty_portion":0,"overpayment_portion":0,"last_error":null}
+
+== 9. ERP: one balanced journal entry per Fineract transaction, same external_reference
+{"external_reference":"DSB-180937","transaction_type":"DISBURSEMENT","total_amount":"5000000.00","lines":["1200 DR 5000000.00 CR 0.00","1100 DR 0.00 CR 5000000.00"]}
+{"external_reference":"RPY-180937-1","transaction_type":"REPAYMENT","total_amount":"458400.00","lines":["1100 DR 458400.00 CR 0.00","1200 DR 0.00 CR 383400.00","4000 DR 0.00 CR 75000.00"]}
+{"external_reference":"RPY-180937-2","transaction_type":"REPAYMENT","total_amount":"300000.00","lines":["1100 DR 300000.00 CR 0.00","1200 DR 0.00 CR 230751.00","4000 DR 0.00 CR 69249.00"]}
+{"external_reference":"RPY-180937-3","transaction_type":"REPAYMENT","total_amount":"1000000.00","lines":["1100 DR 1000000.00 CR 0.00","1200 DR 0.00 CR 879101.00","4000 DR 0.00 CR 120899.00"]}
+{"external_reference":"RPY-180937-FINAL","transaction_type":"REPAYMENT","total_amount":"3742399.00","lines":["1100 DR 3742399.00 CR 0.00","1200 DR 0.00 CR 3506748.00","4000 DR 0.00 CR 235651.00"]}
+
+== 10. ERP ledger for this loan vs Fineract
+1100 Bank: debits=5500799 credits=5000000
+1200 Loan Receivable: debits=5000000 credits=5000000
+4000 Interest Income: debits=0 credits=500799
+fineract: principal_disbursed=5000000 principal_repaid=5000000 interest_repaid=500799 total_repaid=5500799
+integration: 5 transactions, 5 COMPLETED
+
+== Loan LN-2026-000005 closed with obligations met, ledger posted in the ERP

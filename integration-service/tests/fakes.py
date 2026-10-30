@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from app.gateways.erp import ErpAccount, ErpUnavailableError
+from app.gateways.erp import ErpAccount, ErpRejectedError, ErpUnavailableError
 from app.gateways.fineract import FineractRejectedError, FineractUnavailableError
 
 LOAN_RECEIVABLE = ErpAccount(
@@ -34,6 +34,30 @@ class FakeErp:
         if self.down:
             raise ErpUnavailableError("connection refused")
         return self.accounts.get(external_reference)
+
+
+class FakeErpJournal:
+    def __init__(self) -> None:
+        self.entries: dict[str, dict[str, Any]] = {}
+        self.calls = 0
+        self.down = False
+        self.fail_after: Exception | None = None
+        self.reject: ErpRejectedError | None = None
+
+    def post_journal_entry(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.calls += 1
+        if self.down:
+            raise ErpUnavailableError("ConnectError: connection refused")
+        if self.reject is not None:
+            raise self.reject
+        existing = self.entries.get(payload["external_reference"])
+        if existing is not None and existing != payload:
+            raise ErpRejectedError("different payload for the same reference", 409)
+        self.entries[payload["external_reference"]] = payload
+        if self.fail_after is not None:
+            error, self.fail_after = self.fail_after, None
+            raise error
+        return payload
 
 
 class FakeFineract:

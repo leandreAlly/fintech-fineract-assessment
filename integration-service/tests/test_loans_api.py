@@ -10,7 +10,7 @@ from app.gateways.fineract import FineractUnavailableError
 from app.loan_service import LoanService
 from app.main import app
 from app.models import Client
-from tests.fakes import FakeFineractLoans
+from tests.fakes import FakeErpJournal, FakeFineractLoans
 
 
 @pytest.fixture
@@ -19,7 +19,14 @@ def fineract() -> FakeFineractLoans:
 
 
 @pytest.fixture
-def client(session: Session, fineract: FakeFineractLoans) -> Iterator[TestClient]:
+def erp() -> FakeErpJournal:
+    return FakeErpJournal()
+
+
+@pytest.fixture
+def client(
+    session: Session, fineract: FakeFineractLoans, erp: FakeErpJournal
+) -> Iterator[TestClient]:
     session.add(
         Client(client_uid="SME-000001", external_reference="C", name="U", fineract_client_id=7)
     )
@@ -27,6 +34,7 @@ def client(session: Session, fineract: FakeFineractLoans) -> Iterator[TestClient
     service = LoanService(
         session,
         fineract,
+        erp,
         product_external_id="LP-SME-ASSET-FINANCE",
         payment_type_id=1,
         today=lambda: date(2026, 10, 30),

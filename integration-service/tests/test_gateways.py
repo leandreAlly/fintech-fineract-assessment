@@ -4,7 +4,7 @@ from collections.abc import Callable
 import httpx
 import pytest
 
-from app.gateways.erp import ErpClient, ErpUnavailableError
+from app.gateways.erp import ErpClient, ErpRejectedError, ErpUnavailableError
 from app.gateways.fineract import (
     FineractClient,
     FineractRejectedError,
@@ -86,3 +86,38 @@ def test_erp_down_raises_unavailable() -> None:
 
     with pytest.raises(ErpUnavailableError):
         erp(handler).list_accounts()
+
+
+@pytest.mark.parametrize("status_code", [200, 201])
+def test_journal_entry_is_posted(status_code: int) -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(status_code, json={"external_reference": "DSB-1"})
+
+    assert erp(handler).post_journal_entry({"external_reference": "DSB-1"}) == {
+        "external_reference": "DSB-1"
+    }
+    assert (seen[0].method, seen[0].url.path) == ("POST", "/api/journal-entries")
+
+
+@pytest.mark.parametrize("status_code", [409, 422])
+def test_journal_entry_client_errors_are_rejections(status_code: int) -> None:
+    with pytest.raises(ErpRejectedError) as raised:
+        erp(lambda _: httpx.Response(status_code, json={"detail": "x"})).post_journal_entry({})
+
+    assert raised.value.status_code == status_code
+
+
+def test_journal_entry_server_error_is_unavailable() -> None:
+    with pytest.raises(ErpUnavailableError):
+        erp(lambda _: httpx.Response(503)).post_journal_entry({})
+
+
+def test_journal_entry_timeout_is_unavailable() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("timed out", request=request)
+
+    with pytest.raises(ErpUnavailableError, match="ReadTimeout"):
+        erp(handler).post_journal_entry({})

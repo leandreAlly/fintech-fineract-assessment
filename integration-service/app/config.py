@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     fineract_office_external_id: str = "OFFICE-KGL-MAIN"
     fineract_loan_product_external_id: str = "LP-SME-ASSET-FINANCE"
     fineract_payment_type_id: int = 1
+    currency: str = "RWF"
     erp_base_url: str = "http://localhost:8081"
     http_timeout_seconds: float = 10.0
     sync_max_attempts: int = 10

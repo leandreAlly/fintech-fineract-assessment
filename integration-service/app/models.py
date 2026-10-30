@@ -102,8 +102,11 @@ class TransactionType(StrEnum):
 
 class TransactionStatus(StrEnum):
     FINERACT_PENDING = "FINERACT_PENDING"
+    FINERACT_DONE = "FINERACT_DONE"
+    ERP_PENDING = "ERP_PENDING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
+    NEEDS_RECONCILIATION = "NEEDS_RECONCILIATION"
 
 
 class LoanTransaction(Base):
@@ -130,6 +133,8 @@ class LoanTransaction(Base):
     interest_portion: Mapped[int | None] = mapped_column(BigInteger)
     fee_portion: Mapped[int | None] = mapped_column(BigInteger)
     penalty_portion: Mapped[int | None] = mapped_column(BigInteger)
+    overpayment_portion: Mapped[int | None] = mapped_column(BigInteger)
+    erp_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     last_error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

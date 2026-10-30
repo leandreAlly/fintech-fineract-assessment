@@ -4,6 +4,8 @@ import httpx
 
 from app.config import settings
 
+LOAN_LOCKED = "error.msg.loan.locked"
+
 
 class FineractError(Exception):
     def __init__(self, message: str, status_code: int | None = None) -> None:
@@ -97,9 +99,19 @@ class FineractClient:
             raise FineractUnavailableError(
                 f"Fineract returned {response.status_code}", response.status_code
             )
+        if response.status_code == 409 and error_code(response) == LOAN_LOCKED:
+            raise FineractUnavailableError(error_message(response), response.status_code)
         if response.status_code >= 400:
             raise FineractRejectedError(error_message(response), response.status_code)
         return response.json()
+
+
+def error_code(response: httpx.Response) -> str | None:
+    try:
+        code = response.json().get("userMessageGlobalisationCode")
+    except ValueError:
+        return None
+    return str(code) if code else None
 
 
 def error_message(response: httpx.Response) -> str:

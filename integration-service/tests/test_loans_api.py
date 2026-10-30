@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.deps import get_loan_service
 from app.gateways.fineract import FineractUnavailableError
+from app.loan_locks import LoanBusyError
 from app.loan_service import LoanService
 from app.main import app
 from app.models import Client
@@ -89,3 +90,17 @@ def test_fineract_down_returns_503(client: TestClient, fineract: FakeFineractLoa
 )
 def test_invalid_application_is_422(client: TestClient, body: dict[str, object]) -> None:
     assert client.post("/api/loans", json=body).status_code == 422
+
+
+def test_busy_loan_returns_503(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    def busy(*_: object) -> None:
+        raise LoanBusyError("loan 1 is busy, retry later")
+
+    monkeypatch.setattr(LoanService, "repay", busy)
+
+    response = client.post(
+        "/api/loans/LN-2026-000001/repayments", json={"external_reference": "R", "amount": 1}
+    )
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "LOAN_BUSY"

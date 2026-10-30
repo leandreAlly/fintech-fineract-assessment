@@ -1,3 +1,5 @@
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date
 from typing import Any
 
@@ -470,3 +472,72 @@ def test_completed_transaction_is_replayed_without_new_erp_calls(
 
     assert repay(service, loan, "RPY-1", 600_000)["status_code"] == 200
     assert erp.calls == calls
+
+
+class RecordingLocks:
+    def __init__(self) -> None:
+        self.held: list[int] = []
+        self.active = False
+
+    @contextmanager
+    def hold(self, loan_id: int) -> Iterator[None]:
+        self.held.append(loan_id)
+        self.active = True
+        try:
+            yield
+        finally:
+            self.active = False
+
+
+def test_fineract_calls_run_while_holding_the_loan_lock(
+    session: Session, fineract: FakeFineractLoans, erp: FakeErpJournal
+) -> None:
+    locks = RecordingLocks()
+    service = LoanService(
+        session,
+        fineract,
+        erp,
+        product_external_id="LP-SME-ASSET-FINANCE",
+        payment_type_id=1,
+        locks=locks,
+        today=lambda: date(2026, 10, 30),
+    )
+    session.add(
+        Client(client_uid="SME-000001", external_reference="CLI-1", name="U", fineract_client_id=7)
+    )
+    session.commit()
+    seen: list[bool] = []
+    original = fineract.repay_loan
+
+    def repay_loan(loan_id: int, payload: dict[str, Any]) -> None:
+        seen.append(locks.active)
+        original(loan_id, payload)
+
+    fineract.repay_loan = repay_loan  # type: ignore[method-assign]
+    loan = disbursed_loan(service)
+
+    repay(service, loan, "RPY-1", 600_000)
+
+    assert locks.held == [1, 1]
+    assert seen == [True]
+    assert not locks.active
+
+
+def test_loan_locked_by_fineract_stays_pending_and_succeeds_on_retry(
+    service: LoanService, session: Session, fineract: FakeFineractLoans
+) -> None:
+    loan = disbursed_loan(service)
+    fineract.fail_before["repay_loan"] = FineractUnavailableError(
+        "Loan is locked by the COB job. Loan ID: 1", 409
+    )
+
+    with pytest.raises(FineractUnavailableError):
+        repay(service, loan, "RPY-1", 600_000)
+
+    txn = session.scalars(
+        select(LoanTransaction).where(LoanTransaction.external_reference == "RPY-1")
+    ).one()
+    assert txn.status == TransactionStatus.FINERACT_PENDING
+    assert repay(service, loan, "RPY-1", 600_000)["status"] == "COMPLETED"
+    assert fineract.calls["repay_loan"] == 2
+    assert len([t for t in fineract.transactions[1] if t.startswith("RPY")]) == 1

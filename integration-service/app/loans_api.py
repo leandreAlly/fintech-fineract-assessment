@@ -7,7 +7,8 @@ from fastapi.responses import JSONResponse
 from app.clients_api import fineract_unavailable, respond
 from app.deps import get_loan_service
 from app.gateways.fineract import FineractUnavailableError
-from app.idempotency import ApiResult
+from app.idempotency import ApiResult, error_body
+from app.loan_locks import LoanBusyError
 from app.loan_service import (
     ApprovalRequest,
     DisbursementRequest,
@@ -26,6 +27,8 @@ def call(run: Callable[[], ApiResult]) -> JSONResponse:
         return respond(run())
     except FineractUnavailableError as error:
         return fineract_unavailable(error)
+    except LoanBusyError as error:
+        return JSONResponse(status_code=503, content=error_body("LOAN_BUSY", str(error)))
 
 
 @router.post("/api/loans", status_code=201)

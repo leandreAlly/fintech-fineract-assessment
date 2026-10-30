@@ -121,3 +121,24 @@ def test_journal_entry_timeout_is_unavailable() -> None:
 
     with pytest.raises(ErpUnavailableError, match="ReadTimeout"):
         erp(handler).post_journal_entry({})
+
+
+def test_loan_locked_conflict_is_retryable_not_a_rejection() -> None:
+    body = {
+        "httpStatusCode": "409",
+        "defaultUserMessage": "Loan is locked by the COB job. Loan ID: 10",
+        "userMessageGlobalisationCode": "error.msg.loan.locked",
+    }
+
+    with pytest.raises(FineractUnavailableError) as raised:
+        fineract(lambda _: httpx.Response(409, json=body)).repay_loan(10, {})
+
+    assert raised.value.status_code == 409
+    assert "locked" in raised.value.message
+
+
+def test_other_conflicts_stay_rejections() -> None:
+    body = {"userMessageGlobalisationCode": "error.msg.loan.transaction.externalId.duplicate"}
+
+    with pytest.raises(FineractRejectedError):
+        fineract(lambda _: httpx.Response(409, json=body)).repay_loan(10, {})

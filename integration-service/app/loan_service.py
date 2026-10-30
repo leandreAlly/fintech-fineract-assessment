@@ -18,6 +18,7 @@ from app.client_service import fineract_date
 from app.gateways.erp import ErpRejectedError, ErpUnavailableError
 from app.gateways.fineract import FineractRejectedError
 from app.idempotency import ApiResult, Finished, IdempotencyStore, error_body
+from app.loan_locks import LoanLocks, NoLoanLocks
 from app.models import Client, Loan, LoanTransaction, TransactionStatus, TransactionType
 from app.state_machine import transition
 
@@ -133,12 +134,14 @@ class LoanService:
         product_external_id: str,
         payment_type_id: int,
         currency: str = "RWF",
+        locks: LoanLocks | None = None,
         today: Callable[[], date] = date.today,
     ) -> None:
         self.session = session
         self.fineract = fineract
         self.erp = erp
         self.currency = currency
+        self.locks = locks or NoLoanLocks()
         self.product_external_id = product_external_id
         self.payment_type_id = payment_type_id
         self.today = today
@@ -396,7 +399,10 @@ class LoanService:
         self, txn: LoanTransaction, loan_id: int, send: Callable[[], None]
     ) -> ApiResult:
         if txn.status == TransactionStatus.FINERACT_PENDING:
-            self._post_to_fineract(txn, loan_id, send)
+            with self.locks.hold(loan_id):
+                self.session.refresh(txn)
+                if txn.status == TransactionStatus.FINERACT_PENDING:
+                    self._post_to_fineract(txn, loan_id, send)
         if txn.status == TransactionStatus.FAILED:
             return ApiResult(422, error_body("FINERACT_REJECTED", txn.last_error or "rejected"))
         if txn.status in (TransactionStatus.FINERACT_DONE, TransactionStatus.ERP_PENDING):

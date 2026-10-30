@@ -6,10 +6,11 @@ from sqlalchemy.orm import Session
 
 from app.client_service import ClientService
 from app.config import settings
-from app.db import get_session
+from app.db import engine, get_session
 from app.gateways.erp import ErpClient, build_erp_client
 from app.gateways.fineract import FineractClient, build_fineract_client
 from app.gl_sync import GlSyncService
+from app.loan_locks import PostgresLoanLocks
 from app.loan_service import LoanService
 
 
@@ -63,4 +64,5 @@ def get_loan_service(
         product_external_id=settings.fineract_loan_product_external_id,
         payment_type_id=settings.fineract_payment_type_id,
         currency=settings.currency,
+        locks=PostgresLoanLocks(engine, settings.loan_lock_timeout_seconds),
     )

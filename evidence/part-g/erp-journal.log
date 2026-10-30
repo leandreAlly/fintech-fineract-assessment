@@ -1,0 +1,35 @@
+== Balances before
+{"code":"1100","name":"Bank","total_debits":"0.00","total_credits":"0.00","balance":"0.00","line_count":0}
+{"code":"1200","name":"Loan Receivable","total_debits":"0.00","total_credits":"0.00","balance":"0.00","line_count":0}
+{"code":"4000","name":"Interest Income","total_debits":"0.00","total_credits":"0.00","balance":"0.00","line_count":0}
+
+== 1. Same disbursement entry posted 4 times
+HTTP 201 (expected 201) {"external_reference":"DISB-180409","total_amount":"5000000.00","lines":["1200 DR 5000000.00 CR 0.00","1100 DR 0.00 CR 5000000.00"]}
+HTTP 200 (expected 200) {"external_reference":"DISB-180409","total_amount":"5000000.00","lines":["1200 DR 5000000.00 CR 0.00","1100 DR 0.00 CR 5000000.00"]}
+HTTP 200 (expected 200) {"external_reference":"DISB-180409","total_amount":"5000000.00","lines":["1200 DR 5000000.00 CR 0.00","1100 DR 0.00 CR 5000000.00"]}
+HTTP 200 (expected 200) {"external_reference":"DISB-180409","total_amount":"5000000.00","lines":["1200 DR 5000000.00 CR 0.00","1100 DR 0.00 CR 5000000.00"]}
+journal entries with DISB-180409: 1
+
+== 2. 10 concurrent posts of a new repayment entry
+201 200 200 200 200 200 200 200 200 200 
+journal entries with REP-180409: 1
+
+== 3. Same reference, different amounts
+HTTP 409 (expected 409) {"detail":"external_reference DISB-180409 already exists with a different payload"}
+
+== 4. Unbalanced entry (debits 458400, credits 453400)
+HTTP 422 (expected 422) {"detail":[{"type":"value_error","loc":["body"],"msg":"Value error, entry is not balanced: debits 458400.00 != credits 453400.00","input":{"external_reference":"BAD-180409","entry_date":"2026-10-30","currency":"RWF","loan_reference":"LN-DEMO-180409","transaction_type":"REPAYMENT","lines":[{"account_code":"1100","debit":"458400"},{"account_code":"1200","credit":"383400"},{"account_code":"4000","credit":"70000"}]},"ctx":{"error":{}}}]}
+journal entries with BAD-180409: 0
+
+== 5. Unknown account
+HTTP 422 (expected 422) {"detail":"unknown account codes: 9999"}
+
+== 6. Entry by reference
+{"external_reference":"REP-180409","loan_reference":"LN-DEMO-180409","transaction_type":"REPAYMENT","total_amount":"458400.00","lines":[{"account_code":"1100","debit":"458400.00","credit":"0.00"},{"account_code":"1200","debit":"0.00","credit":"383400.00"},{"account_code":"4000","debit":"0.00","credit":"75000.00"}]}
+
+== Balances after (1200 +5000000 -383400, 1100 -5000000 +458400, 4000 +75000)
+{"code":"1100","name":"Bank","total_debits":"458400.00","total_credits":"5000000.00","balance":"-4541600.00","line_count":2}
+{"code":"1200","name":"Loan Receivable","total_debits":"5000000.00","total_credits":"383400.00","balance":"4616600.00","line_count":2}
+{"code":"4000","name":"Interest Income","total_debits":"0.00","total_credits":"75000.00","balance":"75000.00","line_count":1}
+
+== All ERP journal behaviours demonstrated

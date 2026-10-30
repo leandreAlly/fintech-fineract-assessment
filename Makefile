@@ -7,7 +7,7 @@ GRADLE := ./gradlew --no-daemon -Porg.gradle.java.installations.paths=$(JAVA_HOM
 FINERACT_DIR := fineract-customization/fineract
 PY_SERVICES := mock-erp integration-service
 
-.PHONY: help up down reset logs fineract-checkout fineract-patch fineract-test fineract-it setup demo-clients demo-loan demo-a demo-a-sync fineract-image py-sync py-lint py-test test
+.PHONY: help up down reset logs fineract-checkout fineract-patch fineract-test fineract-it setup demo-clients demo-loan demo-erp demo-a demo-a-sync fineract-image py-sync py-lint py-test test
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -44,6 +44,9 @@ demo-clients: ## Scripted demo of client identities (create, find, validate, ide
 
 demo-loan: ## Scripted loan lifecycle: application to Closed, Fineract state after every stage
 	scripts/demo-loan-lifecycle.sh
+
+demo-erp: ## Scripted demo of ERP journal entries and balances
+	scripts/demo-erp-journal.sh
 
 demo-a: ## Scripted demo of Part A behaviours 1-4 against the running stack
 	scripts/demo-part-a.sh

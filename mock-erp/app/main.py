@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app import accounts
+from app import accounts, journal
 from app.db import Base, SessionLocal, engine
 
 
@@ -17,6 +17,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="Mock ERP", lifespan=lifespan)
 app.include_router(accounts.router)
+app.include_router(journal.router)
 
 
 @app.get("/health")

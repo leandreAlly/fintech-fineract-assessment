@@ -1,13 +1,21 @@
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db import get_session
-from app.models import Account
-from app.schemas import AccountIn, AccountOut, AccountType
+from app.models import Account, JournalLine
+from app.schemas import (
+    CENT,
+    DEBIT_NORMAL_TYPES,
+    AccountBalance,
+    AccountIn,
+    AccountOut,
+    AccountType,
+)
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 
@@ -100,9 +108,47 @@ def list_accounts(session: Annotated[Session, Depends(get_session)]) -> list[Acc
     return list(session.scalars(select(Account).order_by(Account.code)))
 
 
-@router.get("/{code}", response_model=AccountOut)
-def get_account(code: str, session: Annotated[Session, Depends(get_session)]) -> Account:
+def account_or_404(session: Session, code: str) -> Account:
     account = session.scalar(select(Account).where(Account.code == code))
     if account is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"account {code} not found")
     return account
+
+
+def account_balance(session: Session, account: Account) -> AccountBalance:
+    debits, credits, count = session.execute(
+        select(
+            func.coalesce(func.sum(JournalLine.debit), 0),
+            func.coalesce(func.sum(JournalLine.credit), 0),
+            func.count(JournalLine.id),
+        ).where(JournalLine.account_id == account.id)
+    ).one()
+    total_debits = Decimal(debits).quantize(CENT)
+    total_credits = Decimal(credits).quantize(CENT)
+    account_type = AccountType(account.type)
+    if account_type in DEBIT_NORMAL_TYPES:
+        balance = total_debits - total_credits
+    else:
+        balance = total_credits - total_debits
+    return AccountBalance(
+        code=account.code,
+        name=account.name,
+        type=account_type,
+        currency=account.currency,
+        total_debits=total_debits,
+        total_credits=total_credits,
+        balance=balance,
+        line_count=count,
+    )
+
+
+@router.get("/{code}", response_model=AccountOut)
+def get_account(code: str, session: Annotated[Session, Depends(get_session)]) -> Account:
+    return account_or_404(session, code)
+
+
+@router.get("/{code}/balance", response_model=AccountBalance)
+def get_account_balance(
+    code: str, session: Annotated[Session, Depends(get_session)]
+) -> AccountBalance:
+    return account_balance(session, account_or_404(session, code))

@@ -1,0 +1,57 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.15, pytest-9.1.1, pluggy-1.7.0 -- /Users/ally/Desktop/fintech-fineract-assessment/integration-service/.venv/bin/python
+rootdir: /Users/ally/Desktop/fintech-fineract-assessment/integration-service
+configfile: pyproject.toml
+plugins: asyncio-1.4.1, anyio-4.15.1
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 5 items
+
+tests_live/test_duplicates_and_concurrency.py::test_i1_same_disbursement_four_times_sequentially 
+== I1 sequential duplicates on LN-2026-000015
+   Requests received:         4
+   HTTP statuses:             [201, 200, 200, 200]
+   Fineract disbursements:    1
+   ERP journal entries:       1
+   Integration transactions:  1
+PASSED
+tests_live/test_duplicates_and_concurrency.py::test_i2a_ten_concurrent_disbursements_same_reference 
+== I2a 10 concurrent disbursements, same reference, on LN-2026-000016
+   Requests received:         10
+   HTTP statuses:             {201: 1, 202: 9}
+   Fineract disbursements:    1
+   ERP journal entries:       1
+   Integration transactions:  1
+PASSED
+tests_live/test_duplicates_and_concurrency.py::test_i2b_ten_concurrent_disbursements_different_references 
+== I2b 10 concurrent disbursements, different references, on LN-2026-000017
+   Requests received:         10
+   HTTP statuses:             {201: 1, 409: 9}
+   409 error codes:           {'LOAN_ALREADY_DISBURSED': 9}
+   Fineract disbursements:    1
+   ERP journal entries:       1
+   Integration transactions:  1
+PASSED
+tests_live/test_duplicates_and_concurrency.py::test_i3_concurrent_repayments_apply_once_each 
+== I3 10 repayments, each sent twice concurrently, on LN-2026-000018
+   Requests received:              20
+   HTTP statuses:                  {201: 10, 202: 10}
+   Distinct references:            10
+   Fineract repayments:            10
+   ERP journal entries:            10
+   Integration transactions:       10
+   Initial outstanding:            5500799
+   Repaid per Fineract breakdown:  2125000
+     principal / interest:         1808379 / 316621
+   Final outstanding (Fineract):   3375799
+   Initial - repaid:               3375799
+   Statuses:                       {'COMPLETED': 10}
+PASSED
+tests_live/test_duplicates_and_concurrency.py::test_last_line_of_defence_fineract_loan_state_without_our_service 
+== Last line of defence: 10 direct Fineract disbursements on LN-2026-000019
+   Requests sent to Fineract:  10
+   HTTP statuses:              {200: 1, 403: 9}
+   Rejection reasons:          {'validation.msg.domain.rule.violation': 9}
+   Fineract disbursements:     1
+PASSED
+
+============================== 5 passed in 13.54s ==============================

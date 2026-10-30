@@ -1,0 +1,27 @@
+Before the fix: 10 repayments x2 fired concurrently on LN-2026-000009 (commit 2eccab1, no per-loan lock,
+Fineract 409 error.msg.loan.locked treated as a rejection).
+
+-- integration service
+ external_reference | amount  |      status      |                 last_error                 
+--------------------+---------+------------------+--------------------------------------------
+ DSB-85826192149    | 5000000 | COMPLETED        | 
+ RPY-85826437526-1  |  125000 | COMPLETED        | 
+ RPY-85826437526-3  |  175000 | FINERACT_PENDING | 
+ RPY-85826437526-0  |  100000 | FAILED           | Loan is locked by the COB job. Loan ID: 10
+ RPY-85826437526-6  |  250000 | FAILED           | Loan is locked by the COB job. Loan ID: 10
+ RPY-85826437526-7  |  275000 | FAILED           | Loan is locked by the COB job. Loan ID: 10
+ RPY-85826437526-2  |  150000 | FAILED           | Loan is locked by the COB job. Loan ID: 10
+ RPY-85826437526-8  |  300000 | FAILED           | Loan is locked by the COB job. Loan ID: 10
+ RPY-85826437526-5  |  225000 | FAILED           | Loan is locked by the COB job. Loan ID: 10
+ RPY-85826437526-9  |  325000 | FAILED           | Loan is locked by the COB job. Loan ID: 10
+ RPY-85826437526-4  |  200000 | FAILED           | Loan is locked by the COB job. Loan ID: 10
+(11 rows)
+
+-- fineract
+    external_id    | amount  |     type     
+-------------------+---------+--------------
+ DSB-85826192149   | 5000000 | DISBURSEMENT
+                   |  500799 | ACCRUAL
+ RPY-85826437526-1 |  125000 | REPAYMENT
+(3 rows)
+

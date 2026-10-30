@@ -7,7 +7,7 @@ GRADLE := ./gradlew --no-daemon -Porg.gradle.java.installations.paths=$(JAVA_HOM
 FINERACT_DIR := fineract-customization/fineract
 PY_SERVICES := mock-erp integration-service
 
-.PHONY: help up down reset logs fineract-checkout fineract-patch fineract-test fineract-it setup demo-clients demo-loan demo-erp demo-a demo-a-sync fineract-image py-sync py-lint py-test test
+.PHONY: help up down reset logs fineract-checkout fineract-patch fineract-test fineract-it setup demo-clients demo-loan demo-erp demo-a demo-a-sync fineract-image py-sync py-lint py-test test-live test
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -61,9 +61,12 @@ py-sync: ## Install Python dependencies for both services
 	@for s in $(PY_SERVICES); do (cd $$s && uv sync); done
 
 py-lint: ## Ruff + mypy for both services
-	@for s in $(PY_SERVICES); do (cd $$s && uv run ruff check . && uv run ruff format --check . && uv run mypy app tests) || exit 1; done
+	@for s in $(PY_SERVICES); do (cd $$s && uv run ruff check . && uv run ruff format --check . && uv run mypy app tests $$(ls -d tests_live 2>/dev/null)) || exit 1; done
 
 py-test: ## pytest for both services
 	@for s in $(PY_SERVICES); do (cd $$s && uv run pytest -q) || exit 1; done
+
+test-live: ## Part I parallel tests against the running stack (duplicates, concurrency)
+	cd integration-service && uv run pytest tests_live -s -v -p no:cacheprovider
 
 test: py-lint py-test fineract-test ## Everything

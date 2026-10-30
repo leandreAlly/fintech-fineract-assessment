@@ -1,0 +1,48 @@
+scripts/demo-part-a-sync.sh
+== 1. Same account sent 4 times to the ERP and synced 4 times
+ERP POST #1 -> 201
+ERP POST #2 -> 200
+ERP POST #3 -> 200
+ERP POST #4 -> 200
+sync #1 -> 200
+sync #2 -> 200
+sync #3 -> 200
+sync #4 -> 200
+{"external_reference":"GL-13155937","status":"SYNCED","attempts":1,"last_error":null,"next_attempt_at":null}
+ERP accounts: 1 | Fineract GL accounts: 1 | mappings: 1
+
+== 2. Four concurrent sync requests for a new account
+responses: 200200200200
+{"external_reference":"GL-5155937","status":"SYNCED","attempts":1,"last_error":null,"next_attempt_at":null}
+ERP accounts: 1 | Fineract GL accounts: 1 | mappings: 1
+
+== 3. Fineract is down: SYNC_PENDING, retried with backoff, then SYNCED
+fineract: stopped
+sync -> 202
+{"external_reference":"GL-2155937","status":"SYNC_PENDING","attempts":1,"last_error":"ConnectError: [Errno -2] Name or service not known","next_attempt_at":"2026-10-30T13:59:42.817339Z"}
+-- after the first backoff, still down
+{"external_reference":"GL-2155937","status":"SYNC_PENDING","attempts":2,"last_error":"ConnectError: [Errno -2] Name or service not known","next_attempt_at":"2026-10-30T13:59:49.217641Z"}
+-- fineract restarting
+fineract: healthy
+-- retry loop synced it without any new request
+{"external_reference":"GL-2155937","status":"SYNCED","attempts":5,"last_error":null,"next_attempt_at":null}
+ERP accounts: 1 | Fineract GL accounts: 1 | mappings: 1
+
+== 4. Fineract rejects the account (same external_id, different payload): FAILED, no retry
+sync -> 422
+{"external_reference":"GL-3155937","status":"FAILED","attempts":1,"last_error":"Fineract rejected the account (409): General Ledger Account with external id GL-3155937 already exists (id 17) with a different payload","next_attempt_at":null}
+
+== 5. Sync status for every account (no Fineract ids exposed)
+{"external_reference":"GL-1100","erp_type":"ASSET","status":"SYNCED","attempts":1}
+{"external_reference":"GL-1200","erp_type":"ASSET","status":"SYNCED","attempts":1}
+{"external_reference":"GL-13155835","erp_type":"ASSET","status":"SYNCED","attempts":1}
+{"external_reference":"GL-13155937","erp_type":"ASSET","status":"SYNCED","attempts":1}
+{"external_reference":"GL-2155835","erp_type":"LIABILITY","status":"SYNCED","attempts":5}
+{"external_reference":"GL-2155937","erp_type":"LIABILITY","status":"SYNCED","attempts":5}
+{"external_reference":"GL-3155835","erp_type":"EQUITY","status":"FAILED","attempts":1}
+{"external_reference":"GL-3155937","erp_type":"EQUITY","status":"FAILED","attempts":1}
+{"external_reference":"GL-4000","erp_type":"INCOME","status":"SYNCED","attempts":1}
+{"external_reference":"GL-5155835","erp_type":"EXPENSE","status":"SYNCED","attempts":1}
+{"external_reference":"GL-5155937","erp_type":"EXPENSE","status":"SYNCED","attempts":1}
+
+== All Python-side sync behaviours demonstrated

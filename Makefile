@@ -7,7 +7,7 @@ GRADLE := ./gradlew --no-daemon -Porg.gradle.java.installations.paths=$(JAVA_HOM
 FINERACT_DIR := fineract-customization/fineract
 PY_SERVICES := mock-erp integration-service
 
-.PHONY: help up down reset logs fineract-checkout fineract-patch fineract-test fineract-it demo-a fineract-image py-sync py-lint py-test test
+.PHONY: help up down reset logs fineract-checkout fineract-patch fineract-test fineract-it demo-a demo-a-sync fineract-image py-sync py-lint py-test test
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -38,6 +38,9 @@ fineract-it: ## Run the JUnit integration test against the running Fineract (mak
 
 demo-a: ## Scripted demo of Part A behaviours 1-4 against the running stack
 	scripts/demo-part-a.sh
+
+demo-a-sync: ## Scripted demo of the Python GL sync (stops and restarts Fineract)
+	scripts/demo-part-a-sync.sh
 
 fineract-image: ## Build the custom Fineract image from source + patch
 	docker compose build fineract

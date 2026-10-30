@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     fineract_verify_tls: bool = False
     erp_base_url: str = "http://localhost:8081"
     http_timeout_seconds: float = 10.0
-    sync_max_attempts: int = 5
+    sync_max_attempts: int = 10
     sync_backoff_base_seconds: float = 2.0
     sync_backoff_max_seconds: float = 60.0
     sync_retry_interval_seconds: float = 5.0

@@ -1,0 +1,27 @@
+$ uv run ruff check . && uv run mypy app tests && uv run pytest -v
+All checks passed!
+Success: no issues found in 11 source files
+============================= test session starts ==============================
+platform darwin -- Python 3.12.15, pytest-9.1.1, pluggy-1.7.0 -- /Users/ally/Desktop/fintech-fineract-assessment/mock-erp/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/ally/Desktop/fintech-fineract-assessment/mock-erp
+configfile: pyproject.toml
+testpaths: tests
+plugins: asyncio-1.4.1, anyio-4.15.1
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 12 items
+
+tests/test_accounts.py::test_create_returns_201 PASSED                   [  8%]
+tests/test_accounts.py::test_same_reference_same_payload_four_times_creates_one_account PASSED [ 16%]
+tests/test_accounts.py::test_same_reference_different_payload_returns_409 PASSED [ 25%]
+tests/test_accounts.py::test_same_code_different_reference_returns_409 PASSED [ 33%]
+tests/test_accounts.py::test_invalid_payload_returns_422[overrides0] PASSED [ 41%]
+tests/test_accounts.py::test_invalid_payload_returns_422[overrides1] PASSED [ 50%]
+tests/test_accounts.py::test_invalid_payload_returns_422[overrides2] PASSED [ 58%]
+tests/test_accounts.py::test_invalid_payload_returns_422[overrides3] PASSED [ 66%]
+tests/test_accounts.py::test_concurrent_insert_of_same_account_resolves_to_existing PASSED [ 75%]
+tests/test_accounts.py::test_list_and_get_by_code PASSED                 [ 83%]
+tests/test_accounts.py::test_seed_is_idempotent PASSED                   [ 91%]
+tests/test_health.py::test_health PASSED                                 [100%]
+
+============================== 12 passed in 0.07s ==============================

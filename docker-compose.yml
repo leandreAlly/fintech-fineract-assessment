@@ -81,6 +81,8 @@ services:
       DATABASE_URL: postgresql+psycopg://integration:${INTEGRATION_DB_PASSWORD:-integration}@db:5432/integration
       FINERACT_BASE_URL: https://fineract:8443/fineract-provider/api/v1
       FINERACT_TENANT: default
+      FINERACT_USERNAME: ${FINERACT_API_USERNAME:-integration_service}
+      FINERACT_PASSWORD: ${FINERACT_API_PASSWORD:-Integr4tion-Svc-26!}
       ERP_BASE_URL: http://mock-erp:8000
     ports:
       - "8080:8000"

@@ -1,0 +1,20 @@
+{
+  "fundSourceAccountId": "1100",
+  "loanPortfolioAccountId": "1200",
+  "transfersInSuspenseAccountId": "1300",
+  "overpaymentLiabilityAccountId": "2100",
+  "interestOnLoanAccountId": "4000",
+  "incomeFromChargeOffInterestAccountId": "4000",
+  "incomeFromGoodwillCreditInterestAccountId": "4000",
+  "incomeFromFeeAccountId": "4100",
+  "incomeFromChargeOffFeesAccountId": "4100",
+  "incomeFromGoodwillCreditFeesAccountId": "4100",
+  "incomeFromPenaltyAccountId": "4200",
+  "incomeFromChargeOffPenaltyAccountId": "4200",
+  "incomeFromGoodwillCreditPenaltyAccountId": "4200",
+  "incomeFromRecoveryAccountId": "4300",
+  "writeOffAccountId": "5100",
+  "chargeOffExpenseAccountId": "5100",
+  "chargeOffFraudExpenseAccountId": "5100",
+  "goodwillCreditAccountId": "5200"
+}

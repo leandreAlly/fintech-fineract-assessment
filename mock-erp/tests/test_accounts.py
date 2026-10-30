@@ -102,4 +102,4 @@ def test_seed_is_idempotent(session: Session) -> None:
     accounts.seed_accounts(session)
     accounts.seed_accounts(session)
 
-    assert account_count(session) == 3
+    assert account_count(session) == len(accounts.SEED_ACCOUNTS) == 10

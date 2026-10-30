@@ -13,26 +13,20 @@ router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 
 SEED_ACCOUNTS = [
     AccountIn(
-        code="1100",
-        name="Bank",
-        type=AccountType.ASSET,
-        currency="RWF",
-        external_reference="GL-1100",
-    ),
-    AccountIn(
-        code="1200",
-        name="Loan Receivable",
-        type=AccountType.ASSET,
-        currency="RWF",
-        external_reference="GL-1200",
-    ),
-    AccountIn(
-        code="4000",
-        name="Interest Income",
-        type=AccountType.INCOME,
-        currency="RWF",
-        external_reference="GL-4000",
-    ),
+        code=code, name=name, type=account_type, currency="RWF", external_reference=f"GL-{code}"
+    )
+    for code, name, account_type in [
+        ("1100", "Bank", AccountType.ASSET),
+        ("1200", "Loan Receivable", AccountType.ASSET),
+        ("1300", "Transfers in Suspense", AccountType.ASSET),
+        ("2100", "Overpayment Liability", AccountType.LIABILITY),
+        ("4000", "Interest Income", AccountType.INCOME),
+        ("4100", "Fee Income", AccountType.INCOME),
+        ("4200", "Penalty Income", AccountType.INCOME),
+        ("4300", "Recovery Income", AccountType.INCOME),
+        ("5100", "Loan Write-off Expense", AccountType.EXPENSE),
+        ("5200", "Goodwill Credit Expense", AccountType.EXPENSE),
+    ]
 ]
 
 

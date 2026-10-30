@@ -1,0 +1,62 @@
+scripts/fineract-setup.sh
+== Currency: RWF
+[{"code":"RWF","decimalPlaces":0}]
+== Office: Kigali Main Office
+created office 2
+== Role 'integration-service' with least-privilege permissions
+created role 3
+["ACTIVATE_CLIENT","APPROVE_LOAN","CREATE_CLIENT","CREATE_LOAN","DISBURSE_LOAN","READ_CLIENT","READ_GLACCOUNT","READ_JOURNALENTRY","READ_LOAN","READ_LOANPRODUCT","READ_OFFICE","REPAYMENT_LOAN","SYNC_GLACCOUNT"]
+== API user 'integration_service'
+created user 4
+{"username":"integration_service","officeName":"Kigali Main Office","roles":["integration-service"]}
+== GL accounts: ERP chart of accounts synced through the Integration Service
+{"external_reference":"GL-1100","erp_type":"ASSET","status":"SYNCED"}
+{"external_reference":"GL-1200","erp_type":"ASSET","status":"SYNCED"}
+{"external_reference":"GL-1300","erp_type":"ASSET","status":"SYNCED"}
+{"external_reference":"GL-2100","erp_type":"LIABILITY","status":"SYNCED"}
+{"external_reference":"GL-4000","erp_type":"INCOME","status":"SYNCED"}
+{"external_reference":"GL-4100","erp_type":"INCOME","status":"SYNCED"}
+{"external_reference":"GL-4200","erp_type":"INCOME","status":"SYNCED"}
+{"external_reference":"GL-4300","erp_type":"INCOME","status":"SYNCED"}
+{"external_reference":"GL-5100","erp_type":"EXPENSE","status":"SYNCED"}
+{"external_reference":"GL-5200","erp_type":"EXPENSE","status":"SYNCED"}
+== Loan product: SME Asset Finance (cash-based accounting)
+created loan product 1
+{"name":"SME Asset Finance","shortName":"SMEA","externalId":"LP-SME-ASSET-FINANCE","currency":"RWF","principal":5000000.000000,"numberOfRepayments":12,"repaymentEvery":1,"repaymentFrequency":"Months","interestRatePerPeriod":18.000000,"interestRateFrequency":"Per year","interestType":"Declining Balance","amortization":"Equal installments","daysInYear":"360 Days","daysInMonth":"30 Days","multiDisburseLoan":false,"accountingRule":"CASH BASED"}
+{"fundSourceAccount":"1100","loanPortfolioAccount":"1200","transfersInSuspenseAccount":"1300","interestOnLoanAccount":"4000","incomeFromFeeAccount":"4100","incomeFromPenaltyAccount":"4200","incomeFromRecoveryAccount":"4300","incomeFromChargeOffFeesAccount":"4100","incomeFromChargeOffInterestAccount":"4000","incomeFromChargeOffPenaltyAccount":"4200","incomeFromGoodwillCreditInterestAccount":"4000","incomeFromGoodwillCreditFeesAccount":"4100","incomeFromGoodwillCreditPenaltyAccount":"4200","writeOffAccount":"5100","goodwillCreditAccount":"5200","chargeOffExpenseAccount":"5100","chargeOffFraudExpenseAccount":"5100","overpaymentLiabilityAccount":"2100"}
+== Least privilege check as 'integration_service'
+{"readable_product":"SME Asset Finance"}
+create office as integration_service -> 403 (expected 403)
+== Fineract setup complete
+
+######## second run: every step must find the existing configuration ########
+scripts/fineract-setup.sh
+== Currency: RWF
+[{"code":"RWF","decimalPlaces":0}]
+== Office: Kigali Main Office
+exists (office 2)
+== Role 'integration-service' with least-privilege permissions
+exists (role 3)
+["ACTIVATE_CLIENT","APPROVE_LOAN","CREATE_CLIENT","CREATE_LOAN","DISBURSE_LOAN","READ_CLIENT","READ_GLACCOUNT","READ_JOURNALENTRY","READ_LOAN","READ_LOANPRODUCT","READ_OFFICE","REPAYMENT_LOAN","SYNC_GLACCOUNT"]
+== API user 'integration_service'
+exists (user 4)
+{"username":"integration_service","officeName":"Kigali Main Office","roles":["integration-service"]}
+== GL accounts: ERP chart of accounts synced through the Integration Service
+{"external_reference":"GL-1100","erp_type":"ASSET","status":"SYNCED"}
+{"external_reference":"GL-1200","erp_type":"ASSET","status":"SYNCED"}
+{"external_reference":"GL-1300","erp_type":"ASSET","status":"SYNCED"}
+{"external_reference":"GL-2100","erp_type":"LIABILITY","status":"SYNCED"}
+{"external_reference":"GL-4000","erp_type":"INCOME","status":"SYNCED"}
+{"external_reference":"GL-4100","erp_type":"INCOME","status":"SYNCED"}
+{"external_reference":"GL-4200","erp_type":"INCOME","status":"SYNCED"}
+{"external_reference":"GL-4300","erp_type":"INCOME","status":"SYNCED"}
+{"external_reference":"GL-5100","erp_type":"EXPENSE","status":"SYNCED"}
+{"external_reference":"GL-5200","erp_type":"EXPENSE","status":"SYNCED"}
+== Loan product: SME Asset Finance (cash-based accounting)
+exists (loan product 1)
+{"name":"SME Asset Finance","shortName":"SMEA","externalId":"LP-SME-ASSET-FINANCE","currency":"RWF","principal":5000000.000000,"numberOfRepayments":12,"repaymentEvery":1,"repaymentFrequency":"Months","interestRatePerPeriod":18.000000,"interestRateFrequency":"Per year","interestType":"Declining Balance","amortization":"Equal installments","daysInYear":"360 Days","daysInMonth":"30 Days","multiDisburseLoan":false,"accountingRule":"CASH BASED"}
+{"fundSourceAccount":"1100","loanPortfolioAccount":"1200","transfersInSuspenseAccount":"1300","interestOnLoanAccount":"4000","incomeFromFeeAccount":"4100","incomeFromPenaltyAccount":"4200","incomeFromRecoveryAccount":"4300","incomeFromChargeOffFeesAccount":"4100","incomeFromChargeOffInterestAccount":"4000","incomeFromChargeOffPenaltyAccount":"4200","incomeFromGoodwillCreditInterestAccount":"4000","incomeFromGoodwillCreditFeesAccount":"4100","incomeFromGoodwillCreditPenaltyAccount":"4200","writeOffAccount":"5100","goodwillCreditAccount":"5200","chargeOffExpenseAccount":"5100","chargeOffFraudExpenseAccount":"5100","overpaymentLiabilityAccount":"2100"}
+== Least privilege check as 'integration_service'
+{"readable_product":"SME Asset Finance"}
+create office as integration_service -> 403 (expected 403)
+== Fineract setup complete

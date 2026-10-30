@@ -45,6 +45,38 @@ class FineractClient:
         body: dict[str, Any] = self._get(f"/clients/{client_id}")
         return body
 
+    def loan_product_id_by_external_id(self, external_id: str) -> int | None:
+        products: list[dict[str, Any]] = self._get("/loanproducts")
+        return next((int(p["id"]) for p in products if p.get("externalId") == external_id), None)
+
+    def create_loan(self, payload: dict[str, Any]) -> int:
+        return int(self._post("/loans", payload)["loanId"])
+
+    def loan_by_external_id(self, external_id: str) -> dict[str, Any] | None:
+        body: dict[str, Any] | None = self._get(f"/loans/external-id/{external_id}", allow_404=True)
+        return body
+
+    def loan(self, loan_id: int) -> dict[str, Any]:
+        body: dict[str, Any] = self._get(f"/loans/{loan_id}")
+        return body
+
+    def approve_loan(self, loan_id: int, payload: dict[str, Any]) -> None:
+        self._post(f"/loans/{loan_id}?command=approve", payload)
+
+    def disburse_loan(self, loan_id: int, payload: dict[str, Any]) -> None:
+        self._post(f"/loans/{loan_id}?command=disburse", payload)
+
+    def repay_loan(self, loan_id: int, payload: dict[str, Any]) -> None:
+        self._post(f"/loans/{loan_id}/transactions?command=repayment", payload)
+
+    def loan_transaction_by_external_id(
+        self, loan_id: int, external_id: str
+    ) -> dict[str, Any] | None:
+        body: dict[str, Any] | None = self._get(
+            f"/loans/{loan_id}/transactions/external-id/{external_id}", allow_404=True
+        )
+        return body
+
     def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         body: dict[str, Any] = self._send("POST", path, payload)
         return body

@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app import accounts_sync, clients_api
+from app import accounts_sync, clients_api, loans_api
 from app.config import settings
 from app.db import engine
 from app.models import GlAccountSync
@@ -25,6 +25,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="Integration Service", lifespan=lifespan)
 app.include_router(accounts_sync.router)
 app.include_router(clients_api.router)
+app.include_router(loans_api.router)
 
 
 @app.get("/health")

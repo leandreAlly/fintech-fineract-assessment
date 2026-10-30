@@ -1,9 +1,22 @@
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Integer, String, Text, UniqueConstraint, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+    text,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 
@@ -65,3 +78,62 @@ class Client(Base):
     name: Mapped[str] = mapped_column(String(100))
     fineract_client_id: Mapped[int] = mapped_column(Integer, unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Loan(Base):
+    __tablename__ = "loans"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    loan_reference: Mapped[str | None] = mapped_column(String(20), unique=True)
+    external_reference: Mapped[str] = mapped_column(String(100), unique=True)
+    client_id: Mapped[int] = mapped_column(ForeignKey("clients.id"))
+    principal: Mapped[int] = mapped_column(BigInteger)
+    fineract_loan_id: Mapped[int | None] = mapped_column(Integer, unique=True)
+    approval_reference: Mapped[str | None] = mapped_column(String(100), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    client: Mapped[Client] = relationship()
+
+
+class TransactionType(StrEnum):
+    DISBURSEMENT = "DISBURSEMENT"
+    REPAYMENT = "REPAYMENT"
+
+
+class TransactionStatus(StrEnum):
+    FINERACT_PENDING = "FINERACT_PENDING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
+class LoanTransaction(Base):
+    __tablename__ = "loan_transactions"
+    __table_args__ = (
+        Index(
+            "one_active_disbursement_per_loan",
+            "loan_id",
+            unique=True,
+            postgresql_where=text("type = 'DISBURSEMENT' AND status <> 'FAILED'"),
+            sqlite_where=text("type = 'DISBURSEMENT' AND status <> 'FAILED'"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    external_reference: Mapped[str] = mapped_column(String(100), unique=True)
+    loan_id: Mapped[int] = mapped_column(ForeignKey("loans.id"))
+    type: Mapped[TransactionType] = mapped_column(String(20))
+    amount: Mapped[int] = mapped_column(BigInteger)
+    transaction_date: Mapped[date] = mapped_column(Date)
+    status: Mapped[TransactionStatus] = mapped_column(String(30))
+    fineract_transaction_id: Mapped[int | None] = mapped_column(Integer)
+    principal_portion: Mapped[int | None] = mapped_column(BigInteger)
+    interest_portion: Mapped[int | None] = mapped_column(BigInteger)
+    fee_portion: Mapped[int | None] = mapped_column(BigInteger)
+    penalty_portion: Mapped[int | None] = mapped_column(BigInteger)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    loan: Mapped[Loan] = relationship()

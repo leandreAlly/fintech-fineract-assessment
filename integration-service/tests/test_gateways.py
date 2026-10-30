@@ -4,8 +4,8 @@ from collections.abc import Callable
 import httpx
 import pytest
 
-from app.clients.erp import ErpClient, ErpUnavailableError
-from app.clients.fineract import (
+from app.gateways.erp import ErpClient, ErpUnavailableError
+from app.gateways.fineract import (
     FineractClient,
     FineractRejectedError,
     FineractUnavailableError,

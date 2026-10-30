@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     fineract_username: str = "integration_service"
     fineract_password: str = "Integr4tion-Svc-26!"
     fineract_verify_tls: bool = False
+    fineract_office_external_id: str = "OFFICE-KGL-MAIN"
     erp_base_url: str = "http://localhost:8081"
     http_timeout_seconds: float = 10.0
     sync_max_attempts: int = 10

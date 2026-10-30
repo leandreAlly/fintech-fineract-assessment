@@ -4,10 +4,11 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
-from app.clients.erp import ErpClient, build_erp_client
-from app.clients.fineract import FineractClient, build_fineract_client
+from app.client_service import ClientService
 from app.config import settings
 from app.db import get_session
+from app.gateways.erp import ErpClient, build_erp_client
+from app.gateways.fineract import FineractClient, build_fineract_client
 from app.gl_sync import GlSyncService
 
 
@@ -40,3 +41,10 @@ def get_sync_service(
     fineract: Annotated[FineractClient, Depends(get_fineract_client)],
 ) -> GlSyncService:
     return build_sync_service(session, erp, fineract)
+
+
+def get_client_service(
+    session: Annotated[Session, Depends(get_session)],
+    fineract: Annotated[FineractClient, Depends(get_fineract_client)],
+) -> ClientService:
+    return ClientService(session, fineract, settings.fineract_office_external_id)

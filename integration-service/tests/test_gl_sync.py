@@ -4,8 +4,8 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.clients.erp import ErpAccount
-from app.clients.fineract import FineractRejectedError, FineractUnavailableError
+from app.gateways.erp import ErpAccount
+from app.gateways.fineract import FineractRejectedError, FineractUnavailableError
 from app.gl_sync import AccountNotFoundError, GlSyncService, backoff_delay
 from app.models import GlAccountSync, SyncStatus
 from tests.fakes import INTEREST_INCOME, LOAN_RECEIVABLE, Clock, FakeErp, FakeFineract

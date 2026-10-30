@@ -2,10 +2,10 @@ import asyncio
 
 import structlog
 
-from app.clients.erp import build_erp_client
-from app.clients.fineract import build_fineract_client
 from app.db import SessionLocal
 from app.deps import build_sync_service
+from app.gateways.erp import build_erp_client
+from app.gateways.fineract import build_fineract_client
 
 log = structlog.get_logger()
 

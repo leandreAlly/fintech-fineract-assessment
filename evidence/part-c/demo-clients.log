@@ -1,0 +1,21 @@
+scripts/demo-clients.sh
+== 1. Create client SME-161214
+HTTP 201 (expected 201) {"client_uid":"SME-161214","external_reference":"CLI-161214-A","name":"Umucyo Traders Ltd","status":"ACTIVE"}
+== 2. Find by client_uid and validate (exists, active, correct name)
+{"client_uid":"SME-161214","external_reference":"CLI-161214-A","name":"Umucyo Traders Ltd","status":"ACTIVE","office":"Kigali Main Office","activation_date":"2026-10-30","checks":{"exists":true,"active":true,"name_matches":true}}
+== 3. Same reference + same payload, 3 more times: original result, no new client
+HTTP 200 (expected 200) {"client_uid":"SME-161214","external_reference":"CLI-161214-A","name":"Umucyo Traders Ltd","status":"ACTIVE"}
+HTTP 200 (expected 200) {"client_uid":"SME-161214","external_reference":"CLI-161214-A","name":"Umucyo Traders Ltd","status":"ACTIVE"}
+HTTP 200 (expected 200) {"client_uid":"SME-161214","external_reference":"CLI-161214-A","name":"Umucyo Traders Ltd","status":"ACTIVE"}
+Fineract clients with externalId SME-161214: 1 | integration clients: 1
+== 4. Same reference + different payload: 409
+HTTP 409 (expected 409) {"error":{"code":"IDEMPOTENCY_CONFLICT","message":"external_reference CLI-161214-A was already used for CREATE_CLIENT with a different payload"}}
+== 5. New reference reusing client_uid: 409
+HTTP 409 (expected 409) {"error":{"code":"CLIENT_UID_CONFLICT","message":"client_uid SME-161214 already belongs to a client"}}
+Fineract clients with externalId SME-161214: 1 | integration clients: 1
+== 6. Ten concurrent requests with the same new reference
+responses: 1x201 9x202 
+Fineract clients with externalId SME-161215: 1 | integration clients: 1
+== 7. Unknown client_uid: 404
+{"error":{"code":"CLIENT_NOT_FOUND","message":"no client SME-999999"}} HTTP 404
+== Client identity behaviours demonstrated

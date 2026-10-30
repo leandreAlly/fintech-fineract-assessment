@@ -28,19 +28,46 @@ class FineractClient:
         body = self._post("/glaccounts/sync", payload)
         return int(body["resourceId"])
 
+    def office_id_by_external_id(self, external_id: str) -> int | None:
+        offices: list[dict[str, Any]] = self._get("/offices")
+        return next((int(o["id"]) for o in offices if o.get("externalId") == external_id), None)
+
+    def create_client(self, payload: dict[str, Any]) -> int:
+        return int(self._post("/clients", payload)["clientId"])
+
+    def client_by_external_id(self, external_id: str) -> dict[str, Any] | None:
+        body: dict[str, Any] | None = self._get(
+            f"/clients/external-id/{external_id}", allow_404=True
+        )
+        return body
+
+    def client(self, client_id: int) -> dict[str, Any]:
+        body: dict[str, Any] = self._get(f"/clients/{client_id}")
+        return body
+
     def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+        body: dict[str, Any] = self._send("POST", path, payload)
+        return body
+
+    def _get(self, path: str, allow_404: bool = False) -> Any:
+        return self._send("GET", path, None, allow_404)
+
+    def _send(
+        self, method: str, path: str, payload: dict[str, Any] | None, allow_404: bool = False
+    ) -> Any:
         try:
-            response = self.http.post(path, json=payload)
+            response = self.http.request(method, path, json=payload)
         except httpx.TransportError as error:
             raise FineractUnavailableError(f"{type(error).__name__}: {error}") from error
+        if allow_404 and response.status_code == 404:
+            return None
         if response.status_code >= 500:
             raise FineractUnavailableError(
                 f"Fineract returned {response.status_code}", response.status_code
             )
         if response.status_code >= 400:
             raise FineractRejectedError(error_message(response), response.status_code)
-        body: dict[str, Any] = response.json()
-        return body
+        return response.json()
 
 
 def error_message(response: httpx.Response) -> str:

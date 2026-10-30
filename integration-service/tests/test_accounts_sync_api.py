@@ -4,8 +4,8 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.clients.fineract import FineractRejectedError, FineractUnavailableError
 from app.deps import get_sync_service
+from app.gateways.fineract import FineractRejectedError, FineractUnavailableError
 from app.gl_sync import GlSyncService
 from app.main import app
 from tests.fakes import INTEREST_INCOME, LOAN_RECEIVABLE, Clock, FakeErp, FakeFineract

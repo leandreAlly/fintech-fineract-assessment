@@ -2,7 +2,7 @@ from typing import Any
 
 import pytest
 
-from app.clients.erp import ErpAccount
+from app.gateways.erp import ErpAccount
 from app.gl_mapping import (
     ERP_TO_FINERACT_GL_TYPE,
     FineractGlType,

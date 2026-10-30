@@ -6,8 +6,8 @@ from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.clients.erp import ErpAccount
-from app.clients.fineract import FineractRejectedError, FineractUnavailableError
+from app.gateways.erp import ErpAccount
+from app.gateways.fineract import FineractRejectedError, FineractUnavailableError
 from app.gl_mapping import UnsupportedAccountTypeError, fineract_gl_payload
 from app.models import GlAccountSync, SyncStatus
 

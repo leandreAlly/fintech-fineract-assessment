@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
-from app.clients.erp import ErpUnavailableError
 from app.deps import get_sync_service
+from app.gateways.erp import ErpUnavailableError
 from app.gl_sync import AccountNotFoundError, GlSyncService
 from app.models import GlAccountSync, SyncStatus
 

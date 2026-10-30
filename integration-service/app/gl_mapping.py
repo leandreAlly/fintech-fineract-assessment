@@ -3,7 +3,7 @@ from enum import IntEnum
 from types import MappingProxyType
 from typing import Any
 
-from app.clients.erp import ErpAccount
+from app.gateways.erp import ErpAccount
 
 
 class FineractGlType(IntEnum):

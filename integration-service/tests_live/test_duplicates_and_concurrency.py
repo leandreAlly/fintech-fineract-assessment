@@ -1,4 +1,5 @@
 from collections import Counter
+from datetime import date
 
 from tests_live.conftest import (
     Api,
@@ -154,13 +155,15 @@ def test_last_line_of_defence_fineract_loan_state_without_our_service(
 ) -> None:
     suffix = unique_suffix()
     with fineract_http() as http:
-        loan_id = http.get(f"/loans/external-id/{approved_loan}").raise_for_status().json()["id"]
+        loan = http.get(f"/loans/external-id/{approved_loan}").raise_for_status().json()
+        loan_id = loan["id"]
+        approved_on = date(*loan["timeline"]["approvedOnDate"]).isoformat()
 
         def disburse(i: int) -> Reply:
             response = http.post(
                 f"/loans/{loan_id}?command=disburse",
                 json={
-                    "actualDisbursementDate": "2026-10-30",
+                    "actualDisbursementDate": approved_on,
                     "transactionAmount": 5_000_000,
                     "externalId": f"DIRECT-{suffix}-{i}",
                     "paymentTypeId": 1,

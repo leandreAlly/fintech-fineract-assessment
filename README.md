@@ -137,4 +137,16 @@ The Fineract source isn't committed, only the patch.
 
 ## Use of AI tools
 
-_To be written._
+AI coding assistants were used as supporting tools throughout the implementation, as permitted by the brief. They helped accelerate development, explore implementation approaches, and drafted much of the code, tests, scripts, and documentation.
+
+The engineering direction, task breakdown, implementation decisions, and validation remained under my responsibility. I worked incrementally, reviewing proposed changes, testing them against the real stack, investigating failures, and adjusting the implementation based on the results before committing and pushing.
+
+The work was organized into small, incremental commits, reflecting an iterative development and validation process.
+
+Testing against the real stack led to several important design adjustments:
+
+- **Concurrent repayment handling:** The initial transaction flow lacked a per-loan lock. The parallel repayment test (I3) applied only 1 of 10 repayments because Fineract 1.15 rejects concurrent writes on the same loan with a 409 "Loan is locked" response. I introduced a per-loan advisory lock and made the response retryable (`evidence/part-i/before-fix-fineract-loan-lock.log`, commits `2eccab1` → `25d1b87`).
+
+- **Reconciliation accuracy:** The reconciliation demo revealed that reversing a repayment changes the split of other same-day repayments. I introduced `SPLIT_MISMATCH` as a manual-review-only status.
+
+- **Test reliability:** The final clean run exposed a live test with a hard-coded date (`8c32595`), which I corrected to avoid date-dependent test behaviour.

@@ -1,52 +1,52 @@
 == Setup: a loan disbursed and repaid three times through the Integration Service
-   DSB-K224001 COMPLETED
-   RPY-K224001-1 COMPLETED
-   RPY-K224001-2 COMPLETED
-   RPY-K224001-3 COMPLETED
-   loan LN-2026-000048
+   DSB-K135717 COMPLETED
+   RPY-K135717-1 COMPLETED
+   RPY-K135717-2 COMPLETED
+   RPY-K135717-3 COMPLETED
+   loan LN-2026-000014
 
 == Seeding the other outcomes deliberately
-   MISSING_IN_ERP: repayment MISS-ERP-224001 posted straight into Fineract (e.g. from the Fineract UI)
-   MISSING_IN_FINERACT: manual journal entry MISS-FIN-224001 posted straight into the ERP
-   AMOUNT_MISMATCH: MISMATCH-224001 is 100000 in Fineract but 90000 in the ERP
-   Reversal: RPY-K224001-2 reversed in Fineract after it was posted to the ERP (Fineract then re-splits RPY-K224001-3)
-   fineract: {"resourceId":205}
+   MISSING_IN_ERP: repayment MISS-ERP-135717 posted straight into Fineract (e.g. from the Fineract UI)
+   MISSING_IN_FINERACT: manual journal entry MISS-FIN-135717 posted straight into the ERP
+   AMOUNT_MISMATCH: MISMATCH-135717 is 100000 in Fineract but 90000 in the ERP
+   Reversal: RPY-K135717-2 reversed in Fineract after it was posted to the ERP (Fineract then re-splits RPY-K135717-3)
+   fineract: {"resourceId":61}
    fineract manuallyReversed: true
 
 == POST /api/reconciliation (read-only)
    summary: MATCHED=1 MISSING_IN_ERP=1 MISSING_IN_FINERACT=1 AMOUNT_MISMATCH=2 TYPE_MISMATCH=0 SPLIT_MISMATCH=2
-   MATCHED              DSB-K224001            fineract=5000000 erp=5000000 diff=0
-   AMOUNT_MISMATCH      MISMATCH-224001        fineract=100000 erp=90000 diff=10000
-   MISSING_IN_ERP       MISS-ERP-224001        fineract=100000 erp=- diff=100000
-   MISSING_IN_FINERACT  MISS-FIN-224001        fineract=- erp=75000 diff=-75000
-   SPLIT_MISMATCH       RPY-K224001-1          fineract=458400 erp=458400 diff=0  (1200: Fineract 394988, ERP 383400; 4000: Fineract 63412, ERP 75000)
-   AMOUNT_MISMATCH      RPY-K224001-2          fineract=0 erp=458400 diff=-458400  (reversed in Fineract, the ERP entry has no reversal)
-   SPLIT_MISMATCH       RPY-K224001-3          fineract=458400 erp=458400 diff=0  (1200: Fineract 383400, ERP 394988; 4000: Fineract 75000, ERP 63412)
+   MATCHED              DSB-K135717            fineract=5000000 erp=5000000 diff=0
+   AMOUNT_MISMATCH      MISMATCH-135717        fineract=100000 erp=90000 diff=10000
+   MISSING_IN_ERP       MISS-ERP-135717        fineract=100000 erp=- diff=100000
+   MISSING_IN_FINERACT  MISS-FIN-135717        fineract=- erp=75000 diff=-75000
+   SPLIT_MISMATCH       RPY-K135717-1          fineract=458400 erp=458400 diff=0  (1200: Fineract 394988, ERP 383400; 4000: Fineract 63412, ERP 75000)
+   AMOUNT_MISMATCH      RPY-K135717-2          fineract=0 erp=458400 diff=-458400  (reversed in Fineract, the ERP entry has no reversal)
+   SPLIT_MISMATCH       RPY-K135717-3          fineract=458400 erp=458400 diff=0  (1200: Fineract 383400, ERP 394988; 4000: Fineract 75000, ERP 63412)
 
 == Explicit, idempotent repairs
-   POST /api/reconciliation/repairs {external_reference: MISS-ERP-224001}
+   POST /api/reconciliation/repairs {external_reference: MISS-ERP-135717}
    -> action=posted_to_erp status=MATCHED
-   POST /api/reconciliation/repairs {external_reference: MISS-ERP-224001}
+   POST /api/reconciliation/repairs {external_reference: MISS-ERP-135717}
    -> action=none status=MATCHED
-   POST /api/reconciliation/repairs {external_reference: RPY-K224001-2}
+   POST /api/reconciliation/repairs {external_reference: RPY-K135717-2}
    -> action=posted_reversal_to_erp status=MATCHED
-   POST /api/reconciliation/repairs {external_reference: RPY-K224001-2}
+   POST /api/reconciliation/repairs {external_reference: RPY-K135717-2}
    -> action=none status=MATCHED
-   POST /api/reconciliation/repairs {external_reference: MISMATCH-224001}
+   POST /api/reconciliation/repairs {external_reference: MISMATCH-135717}
    -> REPAIR_NOT_SUPPORTED: AMOUNT_MISMATCH needs manual review: no automatic repair is safe
-   POST /api/reconciliation/repairs {external_reference: MISS-FIN-224001}
+   POST /api/reconciliation/repairs {external_reference: MISS-FIN-135717}
    -> REPAIR_NOT_SUPPORTED: MISSING_IN_FINERACT needs manual review: no automatic repair is safe
 
 == POST /api/reconciliation after the repairs
    summary: MATCHED=3 MISSING_IN_ERP=0 MISSING_IN_FINERACT=1 AMOUNT_MISMATCH=1 TYPE_MISMATCH=0 SPLIT_MISMATCH=2
-   MATCHED              DSB-K224001            fineract=5000000 erp=5000000 diff=0
-   AMOUNT_MISMATCH      MISMATCH-224001        fineract=100000 erp=90000 diff=10000
-   MATCHED              MISS-ERP-224001        fineract=100000 erp=100000 diff=0
-   MISSING_IN_FINERACT  MISS-FIN-224001        fineract=- erp=75000 diff=-75000
-   SPLIT_MISMATCH       RPY-K224001-1          fineract=458400 erp=458400 diff=0  (1200: Fineract 394988, ERP 383400; 4000: Fineract 63412, ERP 75000)
-   MATCHED              RPY-K224001-2          fineract=0 erp=0 diff=0  (reversed in both systems)
-   SPLIT_MISMATCH       RPY-K224001-3          fineract=458400 erp=458400 diff=0  (1200: Fineract 383400, ERP 394988; 4000: Fineract 75000, ERP 63412)
+   MATCHED              DSB-K135717            fineract=5000000 erp=5000000 diff=0
+   AMOUNT_MISMATCH      MISMATCH-135717        fineract=100000 erp=90000 diff=10000
+   MATCHED              MISS-ERP-135717        fineract=100000 erp=100000 diff=0
+   MISSING_IN_FINERACT  MISS-FIN-135717        fineract=- erp=75000 diff=-75000
+   SPLIT_MISMATCH       RPY-K135717-1          fineract=458400 erp=458400 diff=0  (1200: Fineract 394988, ERP 383400; 4000: Fineract 63412, ERP 75000)
+   MATCHED              RPY-K135717-2          fineract=0 erp=0 diff=0  (reversed in both systems)
+   SPLIT_MISMATCH       RPY-K135717-3          fineract=458400 erp=458400 diff=0  (1200: Fineract 383400, ERP 394988; 4000: Fineract 75000, ERP 63412)
 
 == ERP entries written by the repairs
-   JE-000141 MISS-ERP-224001 REPAYMENT: 1100 DR 100000.00 CR 0.00, 1200 DR 0.00 CR 30751.00, 4000 DR 0.00 CR 69249.00
-   JE-000142 REV-RPY-K224001-2 REPAYMENT_REVERSAL: 1100 DR 0.00 CR 458400.00, 1200 DR 389151.00 CR 0.00, 4000 DR 69249.00 CR 0.00
+   JE-000053 MISS-ERP-135717 REPAYMENT: 1100 DR 100000.00 CR 0.00, 1200 DR 0.00 CR 30751.00, 4000 DR 0.00 CR 69249.00
+   JE-000054 REV-RPY-K135717-2 REPAYMENT_REVERSAL: 1100 DR 0.00 CR 458400.00, 1200 DR 389151.00 CR 0.00, 4000 DR 69249.00 CR 0.00

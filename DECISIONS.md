@@ -159,9 +159,9 @@ curl -s localhost:8080/api/transactions/FIN-2026-000001 -H 'X-API-Key: …' | jq
 ```
 
 ```json
-{"external_reference": "FIN-2026-224349", "loan_reference": "LN-2026-000050", "type": "REPAYMENT", "status": "COMPLETED",
+{"external_reference": "FIN-2026-135721", "loan_reference": "LN-2026-000015", "type": "REPAYMENT", "status": "COMPLETED",
  "amount": 458400, "principal_portion": 383400, "interest_portion": 75000,
- "erp_transaction_id": "JE-000146", "erp_attempts": 2, "last_error": null}
+ "erp_transaction_id": "JE-000056", "erp_attempts": 2, "last_error": null}
 ```
 
 So it's done, but it took two attempts to reach the ERP. Why?
@@ -173,21 +173,21 @@ docker compose logs --no-log-prefix integration-service mock-erp \
   | jq -c 'select(type == "object" and .external_reference == "FIN-2026-000001")'
 ```
 
-Here's the sample trail, from `make demo-trace` (`evidence/observability/trace.log`). The demo generates a fresh reference, `FIN-2026-224349`; the commands are the same for any reference.
+Here's the sample trail, from `make demo-trace` (`evidence/observability/trace.log`). The demo generates a fresh reference, `FIN-2026-135721`; the commands are the same for any reference.
 
 ```
-20:43:51.330 integration-service transaction_received       corr=teller-224349  status=FINERACT_PENDING  LN-2026-000050 SME-324349
-20:43:51.574 integration-service transaction_status_changed corr=teller-224349  FINERACT_PENDING → FINERACT_DONE  fineract_transaction_id=217
-20:43:51.576 integration-service transaction_status_changed corr=teller-224349  FINERACT_DONE → ERP_PENDING
-20:43:51.581 mock-erp            journal_entry_created      corr=teller-224349  erp_transaction_id=JE-000146
-20:43:51.583 integration-service erp_post_failed            corr=teller-224349  ReadTimeout: response lost
-20:43:53.912 mock-erp            journal_entry_replayed     corr=recovery-94ff…  erp_transaction_id=JE-000146
-20:43:53.915 integration-service transaction_status_changed corr=recovery-94ff…  ERP_PENDING → COMPLETED  JE-000146
+11:57:23.390 integration-service transaction_received       corr=teller-135721  status=FINERACT_PENDING  LN-2026-000015 SME-235721
+11:57:23.651 integration-service transaction_status_changed corr=teller-135721  FINERACT_PENDING → FINERACT_DONE  fineract_transaction_id=70
+11:57:23.656 integration-service transaction_status_changed corr=teller-135721  FINERACT_DONE → ERP_PENDING
+11:57:23.661 mock-erp            journal_entry_created      corr=teller-135721  erp_transaction_id=JE-000056
+11:57:23.663 integration-service erp_post_failed            corr=teller-135721  ReadTimeout: response lost
+11:57:26.982 mock-erp            journal_entry_replayed     corr=recovery-0c4c…  erp_transaction_id=JE-000056
+11:57:26.985 integration-service transaction_status_changed corr=recovery-0c4c…  ERP_PENDING → COMPLETED  JE-000056
 ```
 
-Reading it: the teller's request reached Fineract (transaction 217) and the ERP wrote `JE-000146`, but the ERP's answer never came back. So the teller got a 202. Two seconds later the background loop sent the same entry again, the ERP recognised it (`replayed`, not `created`), and the transaction completed. There's one journal entry, not two.
+Reading it: the teller's request reached Fineract (transaction 70) and the ERP wrote `JE-000056`, but the ERP's answer never came back. So the teller got a 202. Three seconds later the background loop sent the same entry again, the ERP recognised it (`replayed`, not `created`), and the transaction completed. There's one journal entry, not two.
 
-Step 3. For everything the teller's request did, filter by `select(.correlation_id == "teller-224349")`. That adds the `http_request` lines: the ERP returned 201, and our API returned 202.
+Step 3. For everything the teller's request did, filter by `select(.correlation_id == "teller-135721")`. That adds the `http_request` lines: the ERP returned 201, and our API returned 202.
 
 ## 12. Smaller decisions and assumptions
 

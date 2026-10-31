@@ -28,7 +28,7 @@ make demo-a demo-a-sync demo-clients demo-loan demo-erp test-live demo-failures 
 | K | Reconciliation | `make demo-reconciliation` | `evidence/part-k/reconciliation.log` |
 | O | What happened to FIN-…? | `make demo-trace` | `evidence/observability/trace.log` |
 
-The Java and Python test runs are in `evidence/part-a/` too (`fineract-unit.log`, `fineract-it.log`, `pytest-*.log`), along with the Docker build of the patched Fineract (`docker-build-erp-gl-sync.log`).
+The Java and Python test runs are in `evidence/part-a/` too (`fineract-unit.log`, `fineract-it.log`), along with the Docker build of the patched Fineract (`docker-build-erp-gl-sync.log`). The Python lint and test run (ruff, mypy, 250 + 32 tests) is in `evidence/tests/python.log`.
 
 ---
 
@@ -42,7 +42,7 @@ This calls the patched `POST /glaccounts/sync` on Fineract directly, as the admi
    - then the same request again
    - then the same `externalId` with name `Loans Receivable`
    - then a sync as a new user whose role lacks `SYNC_GLACCOUNT`, and again after the permission is granted
-3. **Response.** 200 `{resourceId: 6, resourceExternalId: "GL-1200"}` · 200, same id 6 · 409 `error.msg.glaccount.externalid.conflict` · 403 `error.msg.not.authorized` · 200 once the permission is granted.
+3. **Response.** 200 `{resourceId: 2, resourceExternalId: "GL-1200"}` · 200, same id 2 · 409 `error.msg.glaccount.externalid.conflict` · 403 `error.msg.not.authorized` · 200 once the permission is granted.
 4. **Fineract state.** `acc_gl_account` has exactly one row with `external_id = 'GL-1200'`, and the constraint `acc_gl_account_external_id_key UNIQUE (external_id)` exists.
 5. **ERP state.** Not involved.
 6. **Integration state.** Not involved.
@@ -91,30 +91,30 @@ This calls the patched `POST /glaccounts/sync` on Fineract directly, as the admi
 
 ## C. Client identities
 
-1. **Initial state.** No client `SME-161214`.
+1. **Initial state.** No client `SME-135341`.
 2. **Request.**
    - Create, then find by `client_uid`.
    - The same create 3 more times.
    - The same reference with another name.
    - A new reference with the same `client_uid`.
-   - 10 concurrent creates of `SME-161215` with one reference.
+   - 10 concurrent creates of `SME-135342` with one reference.
    - `GET` an unknown `SME-999999`.
 3. **Response.** 201 · 200 with `checks: {exists: true, active: true, name_matches: true}` · 200 ×3 · 409 `IDEMPOTENCY_CONFLICT` · 409 `CLIENT_UID_CONFLICT` · 1×201 and 9×202 · 404 `CLIENT_NOT_FOUND`.
-4. **Fineract state.** One client with `externalId SME-161214`, and one with `SME-161215`.
+4. **Fineract state.** One client with `externalId SME-135341`, and one with `SME-135342`.
 5. **ERP state.** Not involved.
 6. **Integration state.** One `clients` row each.
 7. **Expected.** The same reference never creates two clients, and a reused `client_uid` is rejected.
-8. **Actual.** `Fineract clients with externalId SME-161214: 1 | integration clients: 1`, and the same for `SME-161215` after the concurrent burst.
+8. **Actual.** `Fineract clients with externalId SME-135341: 1 | integration clients: 1`, and the same for `SME-135342` after the concurrent burst.
 9. **Explanation.** The first request inserts an `IN_PROGRESS` idempotency record. The other nine hit the unique key and get 202 instead of starting a second create. `client_uid` is unique in our table, and it's also Fineract's `externalId`, so it's unique there as well. Before creating, the service checks Fineract for that `externalId`, which covers a create that went through but whose response was lost.
 
 ## D. Loan lifecycle to Closed (obligations met)
 
-1. **Initial state.** A new client `SME-665030`.
+1. **Initial state.** A new client `SME-635343`.
 2. **Request.**
    - Apply for 5,000,000, approve, disburse.
    - Repay 458,400, then 300,000, then 1,000,000.
    - Pay off exactly the `total_outstanding` Fineract reports.
-3. **Response.** 201, 200, 201, then 201 for every repayment. `loan_reference` `LN-2026-000003`.
+3. **Response.** 201, 200, 201, then 201 for every repayment. `loan_reference` `LN-2026-000001`.
 4. **Fineract state** after each stage (read from `m_loan` and through the API):
 
    | Stage | Status | Principal outstanding | Interest outstanding | Total outstanding |
@@ -135,7 +135,7 @@ This calls the patched `POST /glaccounts/sync` on Fineract directly, as the admi
 
 ## G. Mock ERP journal
 
-1. **Initial state.** Accounts 1100, 1200 and 4000 at zero.
+1. **Initial state.** Whatever balances the earlier demos left on 1100, 1200 and 4000 (the log prints them first).
 2. **Request.**
    - The same disbursement entry 4 times.
    - 10 concurrent posts of a new repayment entry.
@@ -144,27 +144,27 @@ This calls the patched `POST /glaccounts/sync` on Fineract directly, as the admi
    - An entry on unknown account 9999.
 3. **Response.** 201, 200, 200, 200 · one 201 and nine 200 · 409 · 422 `entry is not balanced` · 422 `unknown account codes: 9999`.
 4. **Fineract state.** Not involved.
-5. **ERP state.** One entry per reference, none for the rejected ones. Balances afterwards: 1200 = 4,616,600, 1100 = −4,541,600, 4000 = 75,000.
+5. **ERP state.** One entry per reference, none for the rejected ones. The balances move by exactly the two entries: 1200 +4,616,600, 1100 −4,541,600, 4000 +75,000.
 6. **Integration state.** Not involved.
 7. **Expected.** The ERP enforces its own uniqueness and only accepts balanced entries on known accounts.
 8. **Actual.** As expected. The balances match the two entries exactly.
-9. **Explanation.** `journal_entries.external_reference` is unique, and each entry stores a hash of its payload. A repeat with the same hash returns the stored entry (200); a different hash gives 409. Balance, known accounts and currency are all checked before anything is written. Check constraints on the lines (no negatives, one side only) stop bad rows even if the code had a bug. *(This log was captured before the common error format went in, so its errors still show FastAPI's `detail` shape. The clean run regenerates it.)*
+9. **Explanation.** `journal_entries.external_reference` is unique, and each entry stores a hash of its payload. A repeat with the same hash returns the stored entry (200); a different hash gives 409. Balance, known accounts and currency are all checked before anything is written. Check constraints on the lines (no negatives, one side only) stop bad rows even if the code had a bug.
 
 ## H. Loan lifecycle with the ERP ledger
 
-1. **Initial state.** The same flow as D, on a new client `SME-680937`.
+1. **Initial state.** The same flow as D, on a new client `SME-635348`.
 2. **Request.** Apply, approve, disburse, three partial repayments and the payoff.
 3. **Response.** Every money movement returns 201 with `status: COMPLETED`.
-4. **Fineract state.** `LN-2026-000005`, Closed (obligations met). Principal repaid 5,000,000, interest repaid 500,799.
+4. **Fineract state.** `LN-2026-000002`, Closed (obligations met). Principal repaid 5,000,000, interest repaid 500,799.
 5. **ERP state.** One balanced entry per Fineract transaction, under the same `external_reference`:
 
    | Reference | Lines |
    |---|---|
-   | DSB-180937 | 1200 DR 5,000,000 / 1100 CR 5,000,000 |
-   | RPY-180937-1 | 1100 DR 458,400 / 1200 CR 383,400 / 4000 CR 75,000 |
-   | RPY-180937-2 | 1100 DR 300,000 / 1200 CR 230,751 / 4000 CR 69,249 |
-   | RPY-180937-3 | 1100 DR 1,000,000 / 1200 CR 879,101 / 4000 CR 120,899 |
-   | RPY-180937-FINAL | 1100 DR 3,742,399 / 1200 CR 3,506,748 / 4000 CR 235,651 |
+   | DSB-135348 | 1200 DR 5,000,000 / 1100 CR 5,000,000 |
+   | RPY-135348-1 | 1100 DR 458,400 / 1200 CR 383,400 / 4000 CR 75,000 |
+   | RPY-135348-2 | 1100 DR 300,000 / 1200 CR 230,751 / 4000 CR 69,249 |
+   | RPY-135348-3 | 1100 DR 1,000,000 / 1200 CR 879,101 / 4000 CR 120,899 |
+   | RPY-135348-FINAL | 1100 DR 3,742,399 / 1200 CR 3,506,748 / 4000 CR 235,651 |
 
 6. **Integration state.** 5 transactions, all `COMPLETED`.
 7. **Expected.** The ERP ledger for the loan agrees with Fineract.
@@ -173,7 +173,7 @@ This calls the patched `POST /glaccounts/sync` on Fineract directly, as the admi
 
 ## I1. Sequential duplicates
 
-1. **Initial state.** An approved loan (`LN-2026-000015`).
+1. **Initial state.** An approved loan (`LN-2026-000009`).
 2. **Request.** The same disbursement (same reference, same body) 4 times in a row.
 3. **Response.** 201, 200, 200, 200, all with the same body.
 4. **Fineract state.** 1 disbursement.
@@ -191,7 +191,7 @@ This calls the patched `POST /glaccounts/sync` on Fineract directly, as the admi
 
 ## I2. Concurrent disbursements
 
-1. **Initial state.** Two approved loans: `LN-2026-000016` for (a), `LN-2026-000017` for (b).
+1. **Initial state.** Two approved loans: `LN-2026-000010` for (a), `LN-2026-000011` for (b).
 2. **Request.** (a) 10 simultaneous disbursements with the **same** reference. (b) 10 simultaneous disbursements with **10 different** references.
 3. **Response.** (a) one 201 and nine 202 (`IN_PROGRESS`). (b) one 201 and nine 409 `LOAN_ALREADY_DISBURSED`.
 4. **Fineract state.** 1 disbursement on each loan.
@@ -209,7 +209,7 @@ This calls the patched `POST /glaccounts/sync` on Fineract directly, as the admi
 
 ## I3. Concurrent repayments
 
-1. **Initial state.** A disbursed loan (`LN-2026-000018`) with 5,500,799 outstanding.
+1. **Initial state.** A disbursed loan (`LN-2026-000012`) with 5,500,799 outstanding.
 2. **Request.** 10 repayments with different references (100,000 to 325,000), each sent **twice** at the same moment: 20 requests in parallel.
 3. **Response.** Ten 201 and ten 202 (the duplicate of each pair).
 4. **Fineract state.** 10 repayments. Final outstanding 3,375,799.
@@ -241,23 +241,23 @@ This one isn't a demo you'd run, but it's worth keeping. It's how I found out th
 
 ## J. Failure scenarios
 
-All five run against one loan (`LN-2026-000046`) with a 100,000 repayment each. Failures are injected either by stopping a container or with `POST /api/admin/faults`. Each scenario prints the integration row, the count of Fineract transactions with that `externalId`, and the count of ERP entries, before, during and after.
+All five run against one loan (`LN-2026-000008`) with a 100,000 repayment each. Failures are injected either by stopping a container or with `POST /api/admin/faults`. Each scenario prints the integration row, the count of Fineract transactions with that `externalId`, and the count of ERP entries, before, during and after.
 
 ### J1. ERP down after Fineract succeeded
 
-1. **Initial state.** No row, 0 in Fineract, 0 in the ERP for `RPY-F220450-1`.
+1. **Initial state.** No row, 0 in Fineract, 0 in the ERP for `RPY-F135413-1`.
 2. **Request.** Mock ERP container stopped, then the repayment.
 3. **Response.** 202 `ERP_PENDING`, `last_error: "ERP unavailable: ConnectError…"`.
 4. **Fineract state.** 1 repayment the whole time.
 5. **ERP state.** 0 while it's down, then 1.
-6. **Integration state.** `ERP_PENDING` with `erp_attempts` 1, then 2, and `next_attempt_at` moving out. After the ERP is started again: `COMPLETED` with `erp_attempts=4`, without any new request. When the caller resends, it gets 200 `COMPLETED` and nothing changes.
+6. **Integration state.** `ERP_PENDING` with `erp_attempts` 1, then 2, and `next_attempt_at` moving out. After the ERP is started again: `COMPLETED` with `erp_attempts=3`, without any new request. When the caller resends, it gets 200 `COMPLETED` and nothing changes.
 7. **Expected.** The caller is told it's pending. The ERP catches up on its own, with no double posting.
 8. **Actual.** As expected: 1 in Fineract, 1 in the ERP.
 9. **Explanation.** Fineract is never called again; the row is past `FINERACT_DONE`. The background loop retries only the ERP post, with backoff. It can't double post, because the ERP is idempotent on `external_reference`, and a retry of the same entry would just get 200.
 
 ### J2. Fineract down
 
-1. **Initial state.** Nothing for `RPY-F220450-2`.
+1. **Initial state.** Nothing for `RPY-F135413-2`.
 2. **Request.** Fineract container stopped, then the repayment. Resent while still down. Fineract started. Resent again.
 3. **Response.** 503 `FINERACT_UNAVAILABLE` · 503 · 201 `COMPLETED`.
 4. **Fineract state.** 0 until the last request, then 1.
@@ -269,7 +269,7 @@ All five run against one loan (`LN-2026-000046`) with a 100,000 repayment each. 
 
 ### J3. Fineract timeout after sending
 
-1. **Initial state.** Nothing for `RPY-F220450-3`.
+1. **Initial state.** Nothing for `RPY-F135413-3`.
 2. **Request.** Fault `fineract.repayment timeout_after` armed, then the repayment. The request reaches Fineract and is applied, but our client reports a timeout.
 3. **Response.** 503 `FINERACT_UNAVAILABLE`, because from the caller's side we genuinely don't know yet.
 4. **Fineract state.** **1**: the repayment did go through.
@@ -277,30 +277,30 @@ All five run against one loan (`LN-2026-000046`) with a 100,000 repayment each. 
 6. **Integration state.** `FINERACT_PENDING`, then `COMPLETED` with `erp_attempts=1`, without any new request. A later resend got 200.
 7. **Expected.** Find out whether it succeeded, without blindly retrying.
 8. **Actual.** Fineract has 1 and the ERP has 1. Nothing was sent twice.
-9. **Explanation.** This is the case the `externalId` is for. The sweep asks Fineract for `RPY-F220450-3`, finds it, reads its split and carries on to the ERP. Every path that might send to Fineract looks the reference up first.
+9. **Explanation.** This is the case the `externalId` is for. The sweep asks Fineract for `RPY-F135413-3`, finds it, reads its split and carries on to the ERP. Every path that might send to Fineract looks the reference up first.
 
 ### J4. ERP timeout after the entry was written
 
-1. **Initial state.** Nothing for `RPY-F220450-4`.
+1. **Initial state.** Nothing for `RPY-F135413-4`.
 2. **Request.** Fault `erp.journal_entry timeout_after` armed, then the repayment. The ERP writes the entry, but our client reports a timeout.
 3. **Response.** 202 `ERP_PENDING`.
 4. **Fineract state.** 1.
 5. **ERP state.** **1** right away, and still 1 after the retry.
 6. **Integration state.** `ERP_PENDING` with `erp_attempts=1`, then `COMPLETED` with `erp_attempts=2`.
 7. **Expected.** The retry doesn't create a second entry.
-8. **Actual.** `ERP entries for RPY-F220450-4: 1 (the retry got 200 for the identical entry)`.
+8. **Actual.** `ERP entries for RPY-F135413-4: 1 (the retry got 200 for the identical entry)`.
 9. **Explanation.** The retry sends the identical payload. The ERP matches it by reference and payload hash and returns the stored entry with 200, which we treat as success.
 
 ### J5. Crash between Fineract success and the ERP call
 
-1. **Initial state.** Nothing for `RPY-F220450-5`.
+1. **Initial state.** Nothing for `RPY-F135413-5`.
 2. **Request.** Fault `fineract.repayment crash_after` armed, then the repayment. The process dies (`os._exit`) right after Fineract applied it.
 3. **Response.** None: the connection dropped (`HTTP 000`). The container exited.
 4. **Fineract state.** 1.
 5. **ERP state.** 0 while the service is dead, then 1.
 6. **Integration state.**
    - **While dead:** the row is `FINERACT_PENDING` and the idempotency record is `IN_PROGRESS`.
-   - **On restart:** the startup sweep logged `RPY-F220450-5: FINERACT_PENDING → COMPLETED`.
+   - **On restart:** the startup sweep logged `RPY-F135413-5: FINERACT_PENDING → COMPLETED`.
    - **Caller resends within 60 s:** 202 `IN_PROGRESS`, because the crashed request still holds the lease.
    - **Caller resends after the lease:** 200 `COMPLETED`.
 7. **Expected.** The interrupted transaction is found after restart and completed.
@@ -309,25 +309,25 @@ All five run against one loan (`LN-2026-000046`) with a 100,000 repayment each. 
 
 ## K. Reconciliation
 
-1. **Initial state.** Loan `LN-2026-000048`, disbursed and repaid three times through the service, all `COMPLETED`. The other outcomes are then seeded on purpose:
-   - **MISSING_IN_ERP:** `MISS-ERP-224001`, a repayment posted straight into Fineract.
-   - **MISSING_IN_FINERACT:** `MISS-FIN-224001`, a manual journal entry posted straight into the ERP.
-   - **AMOUNT_MISMATCH:** `MISMATCH-224001`, 100,000 in Fineract and 90,000 in the ERP.
-   - **Reversal:** `RPY-K224001-2` reversed in Fineract after it reached the ERP.
-2. **Request.** `POST /api/reconciliation` for the loan. Then repairs for `MISS-ERP-224001` and `RPY-K224001-2`, each twice, and for the two that can't be repaired. Then the report again.
+1. **Initial state.** Loan `LN-2026-000014`, disbursed and repaid three times through the service, all `COMPLETED`. The other outcomes are then seeded on purpose:
+   - **MISSING_IN_ERP:** `MISS-ERP-135717`, a repayment posted straight into Fineract.
+   - **MISSING_IN_FINERACT:** `MISS-FIN-135717`, a manual journal entry posted straight into the ERP.
+   - **AMOUNT_MISMATCH:** `MISMATCH-135717`, 100,000 in Fineract and 90,000 in the ERP.
+   - **Reversal:** `RPY-K135717-2` reversed in Fineract after it reached the ERP.
+2. **Request.** `POST /api/reconciliation` for the loan. Then repairs for `MISS-ERP-135717` and `RPY-K135717-2`, each twice, and for the two that can't be repaired. Then the report again.
 3. **Response.**
 
    | Reference | Before | After repairs |
    |---|---|---|
-   | DSB-K224001 | MATCHED | MATCHED |
-   | MISS-ERP-224001 | MISSING_IN_ERP (100,000) | MATCHED, `posted_to_erp`, then `none` on the second call |
-   | MISS-FIN-224001 | MISSING_IN_FINERACT (75,000) | unchanged, `REPAIR_NOT_SUPPORTED` |
-   | MISMATCH-224001 | AMOUNT_MISMATCH (diff 10,000) | unchanged, `REPAIR_NOT_SUPPORTED` |
-   | RPY-K224001-2 | AMOUNT_MISMATCH (Fineract 0 after reversal, ERP 458,400) | MATCHED, `posted_reversal_to_erp`, then `none` |
-   | RPY-K224001-1, -3 | SPLIT_MISMATCH | unchanged |
+   | DSB-K135717 | MATCHED | MATCHED |
+   | MISS-ERP-135717 | MISSING_IN_ERP (100,000) | MATCHED, `posted_to_erp`, then `none` on the second call |
+   | MISS-FIN-135717 | MISSING_IN_FINERACT (75,000) | unchanged, `REPAIR_NOT_SUPPORTED` |
+   | MISMATCH-135717 | AMOUNT_MISMATCH (diff 10,000) | unchanged, `REPAIR_NOT_SUPPORTED` |
+   | RPY-K135717-2 | AMOUNT_MISMATCH (Fineract 0 after reversal, ERP 458,400) | MATCHED, `posted_reversal_to_erp`, then `none` |
+   | RPY-K135717-1, -3 | SPLIT_MISMATCH | unchanged |
 
 4. **Fineract state.** Unchanged by reconciliation. Repairs never write to Fineract.
-5. **ERP state.** Two new entries from the repairs: `JE-000141` for `MISS-ERP-224001`, built from Fineract's split, and `JE-000142` `REV-RPY-K224001-2`, the mirror image of the original entry.
+5. **ERP state.** Two new entries from the repairs: `JE-000053` for `MISS-ERP-135717`, built from Fineract's split, and `JE-000054` `REV-RPY-K135717-2`, the mirror image of the original entry.
 6. **Integration state.** Unchanged by the report.
 7. **Expected.** All four statuses appear. The report is read-only. Repairs are explicit and idempotent.
 8. **Actual.** As expected. The summary went from `MATCHED=1 MISSING_IN_ERP=1 MISSING_IN_FINERACT=1 AMOUNT_MISMATCH=2 SPLIT_MISMATCH=2` to `MATCHED=3 MISSING_IN_FINERACT=1 AMOUNT_MISMATCH=1 SPLIT_MISMATCH=2`.
@@ -339,18 +339,18 @@ All five run against one loan (`LN-2026-000046`) with a 100,000 repayment each. 
 
 ## O. What happened to FIN-2026-…?
 
-1. **Initial state.** Loan `LN-2026-000050`, active.
-2. **Request.** A teller posts repayment `FIN-2026-224349` with `X-Correlation-ID: teller-224349`. A fault makes the first ERP response get lost after the entry is written.
-3. **Response.** 202 `ERP_PENDING`, with `x-correlation-id: teller-224349` echoed back.
-4. **Fineract state.** Transaction 217.
-5. **ERP state.** `JE-000146`, written on the first attempt and replayed (not duplicated) on the second.
-6. **Integration state.** `COMPLETED`, `erp_attempts=2`, `erp_transaction_id=JE-000146`.
+1. **Initial state.** Loan `LN-2026-000015`, active.
+2. **Request.** A teller posts repayment `FIN-2026-135721` with `X-Correlation-ID: teller-135721`. A fault makes the first ERP response get lost after the entry is written.
+3. **Response.** 202 `ERP_PENDING`, with `x-correlation-id: teller-135721` echoed back.
+4. **Fineract state.** Transaction 70.
+5. **ERP state.** `JE-000056`, written on the first attempt and replayed (not duplicated) on the second.
+6. **Integration state.** `COMPLETED`, `erp_attempts=2`, `erp_transaction_id=JE-000056`.
 7. **Expected.** One API call and the logs are enough to explain the whole story.
-8. **Actual.** `GET /api/transactions/FIN-2026-224349` gives the final state. Filtering both services' logs by `external_reference` gives seven lines, in order:
+8. **Actual.** `GET /api/transactions/FIN-2026-135721` gives the final state. Filtering both services' logs by `external_reference` gives seven lines, in order:
    1. received;
-   2. `FINERACT_DONE` (Fineract id 217);
+   2. `FINERACT_DONE` (Fineract id 70);
    3. `ERP_PENDING`;
-   4. ERP `journal_entry_created` `JE-000146`;
+   4. ERP `journal_entry_created` `JE-000056`;
    5. `erp_post_failed` (read timeout);
    6. ERP `journal_entry_replayed` under a `recovery-…` correlation ID;
    7. `COMPLETED`.

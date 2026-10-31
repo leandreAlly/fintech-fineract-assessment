@@ -7,7 +7,7 @@ asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, a
 collecting ... collected 5 items
 
 tests_live/test_duplicates_and_concurrency.py::test_i1_same_disbursement_four_times_sequentially 
-== I1 sequential duplicates on LN-2026-000015
+== I1 sequential duplicates on LN-2026-000009
    Requests received:         4
    HTTP statuses:             [201, 200, 200, 200]
    Fineract disbursements:    1
@@ -15,7 +15,7 @@ tests_live/test_duplicates_and_concurrency.py::test_i1_same_disbursement_four_ti
    Integration transactions:  1
 PASSED
 tests_live/test_duplicates_and_concurrency.py::test_i2a_ten_concurrent_disbursements_same_reference 
-== I2a 10 concurrent disbursements, same reference, on LN-2026-000016
+== I2a 10 concurrent disbursements, same reference, on LN-2026-000010
    Requests received:         10
    HTTP statuses:             {201: 1, 202: 9}
    Fineract disbursements:    1
@@ -23,7 +23,7 @@ tests_live/test_duplicates_and_concurrency.py::test_i2a_ten_concurrent_disbursem
    Integration transactions:  1
 PASSED
 tests_live/test_duplicates_and_concurrency.py::test_i2b_ten_concurrent_disbursements_different_references 
-== I2b 10 concurrent disbursements, different references, on LN-2026-000017
+== I2b 10 concurrent disbursements, different references, on LN-2026-000011
    Requests received:         10
    HTTP statuses:             {201: 1, 409: 9}
    409 error codes:           {'LOAN_ALREADY_DISBURSED': 9}
@@ -32,7 +32,7 @@ tests_live/test_duplicates_and_concurrency.py::test_i2b_ten_concurrent_disbursem
    Integration transactions:  1
 PASSED
 tests_live/test_duplicates_and_concurrency.py::test_i3_concurrent_repayments_apply_once_each 
-== I3 10 repayments, each sent twice concurrently, on LN-2026-000018
+== I3 10 repayments, each sent twice concurrently, on LN-2026-000012
    Requests received:              20
    HTTP statuses:                  {201: 10, 202: 10}
    Distinct references:            10
@@ -47,11 +47,11 @@ tests_live/test_duplicates_and_concurrency.py::test_i3_concurrent_repayments_app
    Statuses:                       {'COMPLETED': 10}
 PASSED
 tests_live/test_duplicates_and_concurrency.py::test_last_line_of_defence_fineract_loan_state_without_our_service 
-== Last line of defence: 10 direct Fineract disbursements on LN-2026-000019
+== Last line of defence: 10 direct Fineract disbursements on LN-2026-000013
    Requests sent to Fineract:  10
    HTTP statuses:              {200: 1, 403: 9}
    Rejection reasons:          {'validation.msg.domain.rule.violation': 9}
    Fineract disbursements:     1
 PASSED
 
-============================== 5 passed in 13.54s ==============================
+============================== 5 passed in 13.79s ==============================

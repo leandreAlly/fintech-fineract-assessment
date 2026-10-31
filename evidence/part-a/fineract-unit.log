@@ -1,3 +1,4 @@
+$ ./gradlew :fineract-accounting:test --tests '*GlAccountExternalReference*' --rerun
 To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.14.5/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
 Daemon will be stopped at the end of the build 
 > Task :buildSrc:extractPluginRequests UP-TO-DATE
@@ -24,27 +25,27 @@ project version: 1.15.0
 > Task :fineract-avro-schemas:spotlessJson UP-TO-DATE
 > Task :fineract-avro-schemas:spotlessJsonApply UP-TO-DATE
 > Task :fineract-avro-schemas:buildJavaSdk UP-TO-DATE
-> Task :fineract-avro-schemas:compileJava UP-TO-DATE
-> Task :fineract-command:compileJava UP-TO-DATE
 > Task :fineract-validation:compileJava UP-TO-DATE
+> Task :fineract-command:compileJava UP-TO-DATE
+> Task :fineract-avro-schemas:compileJava UP-TO-DATE
 > Task :fineract-validation:processResources UP-TO-DATE
+> Task :fineract-validation:classes UP-TO-DATE
 > Task :fineract-command:processResources UP-TO-DATE
 > Task :fineract-command:classes UP-TO-DATE
-> Task :fineract-validation:classes UP-TO-DATE
 > Task :fineract-validation:jar UP-TO-DATE
+> Task :fineract-command:jar UP-TO-DATE
 > Task :fineract-avro-schemas:processResources UP-TO-DATE
 > Task :fineract-avro-schemas:classes UP-TO-DATE
-> Task :fineract-command:jar UP-TO-DATE
 > Task :fineract-avro-schemas:jar UP-TO-DATE
+
+> Task :fineract-core:generateStaticWeavingPersistenceXml
+Generated EclipseLink static weaving persistence.xml for :fineract-core with 40 managed classes from 1 modules
 
 > Task :fineract-charge:generateStaticWeavingPersistenceXml
 Generated EclipseLink static weaving persistence.xml for :fineract-charge with 47 managed classes from 3 modules
 
 > Task :fineract-tax:generateStaticWeavingPersistenceXml
 Generated EclipseLink static weaving persistence.xml for :fineract-tax with 44 managed classes from 2 modules
-
-> Task :fineract-core:generateStaticWeavingPersistenceXml
-Generated EclipseLink static weaving persistence.xml for :fineract-core with 40 managed classes from 1 modules
 
 > Task :fineract-charge:processResources UP-TO-DATE
 
@@ -72,17 +73,17 @@ OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader clas
 
 > Task :fineract-accounting:test
 
-org.apache.fineract.accounting.glaccount.service.GlAccountExternalReferenceSyncTest
+[0K[1morg.apache.fineract.accounting.glaccount.service.GlAccountExternalReferenceSyncTest[m
 
-  Test rejectsMissingExternalId() PASSED
-  Test treatsStoredEmptyDescriptionAsSameAsMissingDescription() PASSED
-  Test rejectsSameReferenceWithDifferentPayload() PASSED
-  Test createsAccountWithExternalIdWhenReferenceIsNew() PASSED
-  Test returnsExistingAccountForSameReferenceAndIdenticalPayload() PASSED
-  Test turnsUniqueConstraintRaceIntoRetryableConcurrencyFailure() PASSED
-  Test rejectsGlCodeAlreadyUsedByAnotherAccount() PASSED
+[0K[1m  Test [22mrejectsMissingExternalId()[32m PASSED[m
+[0K[1m  Test [22mtreatsStoredEmptyDescriptionAsSameAsMissingDescription()[32m PASSED[m
+[0K[1m  Test [22mrejectsSameReferenceWithDifferentPayload()[32m PASSED[m
+[0K[1m  Test [22mcreatesAccountWithExternalIdWhenReferenceIsNew()[32m PASSED[m
+[0K[1m  Test [22mreturnsExistingAccountForSameReferenceAndIdenticalPayload()[32m PASSED[m
+[0K[1m  Test [22mturnsUniqueConstraintRaceIntoRetryableConcurrencyFailure()[32m PASSED[m
+[0K[1m  Test [22mrejectsGlCodeAlreadyUsedByAnotherAccount()[32m PASSED[m
 
-SUCCESS: Executed 7 tests in 1.2s
+[0K[1;32mSUCCESS: [39mExecuted 7 tests in 1.3s[m
 
 
 [Incubating] Problems report is available at: file:///Users/ally/Desktop/fintech-fineract-assessment/fineract-customization/fineract/build/reports/problems/problems-report.html
@@ -93,5 +94,6 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/8.14.5/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD SUCCESSFUL in 8s
+BUILD SUCCESSFUL in 9s
 37 actionable tasks: 5 executed, 32 up-to-date
+JUnit result: <testsuite name="org.apache.fineract.accounting.glaccount.service.GlAccountExternalReferenceSyncTest" tests="7" skipped="0" failures="0" errors="0"
